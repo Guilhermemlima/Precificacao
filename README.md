@@ -44,6 +44,25 @@ Outras regras do modelo:
 - Biblioteca de peças salvas, exportação/importação em JSON e orçamento pronto para copiar
 - **Orçamento em PDF** em folha A4, com logo e foto do produto, para enviar ao cliente
 
+## Pedidos e painel
+
+A segunda aba é o controle do negócio. Cada cálculo pode virar um **pedido**, que congela os números do momento (receita, custo por categoria, horas de máquina, depreciação) — mexer no preço do filamento depois não reescreve o histórico.
+
+Status: em negociação → aguardando pagamento → pago, mais cancelado. Só o que está **pago** entra na receita; o resto aparece como pipeline.
+
+Indicadores do mês:
+
+| Métrica | Como sai |
+|---|---|
+| Receita recebida | soma dos pedidos pagos |
+| Lucro bruto | receita − custo de produção − seu trabalho |
+| Lucro líquido | lucro bruto − taxas − custos fixos e reserva de falhas |
+| Margem líquida | lucro líquido ÷ receita |
+| Retorno sobre o custo (ROI) | lucro líquido ÷ tudo que foi gasto |
+| Payback da máquina | lucro líquido acumulado ÷ investimento |
+
+Mais: gráfico de receita dos últimos 6 meses, composição da receita do mês, pipeline em aberto, e a divisão do lucro entre reserva para refazer peça, reinvestimento e o que sobra para você — tudo em percentuais que você define.
+
 ## O orçamento em PDF
 
 Não usa biblioteca de PDF: a página monta uma folha A4 real e chama a impressão do navegador, onde o destino "Salvar como PDF" gera o arquivo. O texto sai vetorial e selecionável, e o nome do arquivo já vem sugerido como `Orcamento-0001-Nome-do-Cliente.pdf`.

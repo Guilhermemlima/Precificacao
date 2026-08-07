@@ -80,6 +80,66 @@ header.top::after{
 .brand p{margin:2px 0 0; font-size:12.5px; color:var(--muted); letter-spacing:.06em; text-transform:uppercase; font-family:var(--font-display)}
 .top-actions{display:flex; gap:8px; flex-wrap:wrap}
 
+/* ---------- tabs ---------- */
+.tabs{
+  position:relative; z-index:1; max-width:1320px; margin:0 auto; padding:0 20px;
+  display:flex; align-items:center; gap:4px;
+}
+.tab{
+  background:transparent; border:0; border-bottom:2px solid transparent; color:var(--muted);
+  font-family:var(--font-display); font-size:14px; letter-spacing:.07em; text-transform:uppercase;
+  font-weight:600; padding:9px 12px 8px; margin-bottom:-1px; transition:color .14s, border-color .14s;
+}
+.tab:hover{color:var(--ink-2)}
+.tab.on{color:var(--accent); border-bottom-color:var(--accent)}
+.tab-badge{
+  margin-left:auto; font-family:var(--font-mono); font-size:11.5px; color:var(--muted);
+  padding-bottom:8px; text-align:right;
+}
+
+/* ---------- painel de gestão ---------- */
+.mes-bar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:22px 0 16px}
+.mes-lab{font-family:var(--font-display); font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted)}
+.tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(178px,1fr)); gap:12px; margin-bottom:16px}
+.tile{background:var(--surface); border:1px solid var(--line); border-radius:11px; padding:13px 15px 14px; box-shadow:var(--shadow)}
+.tile .k{font-size:11.5px; color:var(--muted); letter-spacing:.03em; line-height:1.3}
+.tile .v{font-family:var(--font-mono); font-size:25px; font-weight:600; line-height:1.15; margin-top:4px}
+.tile .v.good{color:var(--good)} .tile .v.bad{color:var(--bad)} .tile .v.accent{color:var(--accent)}
+.tile .n{font-size:11.5px; color:var(--ink-2); margin-top:3px; line-height:1.35}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px}
+@media (max-width:900px){ .grid2{grid-template-columns:1fr} }
+#viewGestao > .card{margin-bottom:16px}
+
+/* colunas de receita por mês */
+.cols{display:flex; align-items:flex-end; gap:8px; height:132px; padding-top:20px}
+.cols .cl{flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; height:100%; gap:6px; min-width:0}
+.cols .cl .bx{width:100%; max-width:24px; background:var(--s1); border-radius:4px 4px 0 0; min-height:2px; transition:filter .12s}
+.cols .cl:hover .bx{filter:brightness(1.15)}
+.cols .cl .lb{font-family:var(--font-mono); font-size:10.5px; color:var(--muted); white-space:nowrap}
+.cols .cl.atual .lb{color:var(--ink); font-weight:700}
+.cols .cl .vl{font-family:var(--font-mono); font-size:10.5px; color:var(--ink-2); white-space:nowrap; margin-bottom:-2px}
+
+/* medidor de payback */
+.meter{height:14px; border-radius:7px; background:var(--surface-3); overflow:hidden; border:1px solid var(--line)}
+.meter span{display:block; height:100%; background:var(--accent); border-radius:7px 0 0 7px; transition:width .3s}
+
+/* status */
+.pill{
+  display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:3px 10px;
+  font-size:11.5px; font-weight:600; white-space:nowrap; border:1px solid;
+}
+.pill::before{content:""; width:6px; height:6px; border-radius:50%; background:currentColor; flex:none}
+.pill.negociacao{color:var(--warn); border-color:var(--warn)}
+.pill.aguardando{color:var(--s1); border-color:var(--s1)}
+.pill.pago{color:var(--good); border-color:var(--good)}
+.pill.cancelado{color:var(--muted); border-color:var(--line-strong)}
+select.st{width:auto; padding:5px 8px; font-size:12.5px; border-radius:6px}
+input.dt{
+  background:var(--surface-2); color:var(--ink); border:1px solid var(--line-strong);
+  border-radius:6px; padding:4px 7px; font-family:var(--font-mono); font-size:12.5px;
+}
+input.dt:focus{outline:none; border-color:var(--accent)}
+
 /* ---------- controls ---------- */
 .btn{
   background:var(--surface-2); color:var(--ink); border:1px solid var(--line-strong);
@@ -295,9 +355,15 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
       <input type="file" id="fileIn" accept="application/json" hidden>
     </div>
   </div>
+  <nav class="tabs">
+    <button class="tab on" id="tabCalc" type="button">Calculadora</button>
+    <button class="tab" id="tabGestao" type="button">Pedidos e painel</button>
+    <span class="tab-badge" id="tabBadge"></span>
+  </nav>
 </header>
 
 <div class="wrap">
+<div id="viewCalc">
 <div class="grid">
 
   <!-- ============ ENTRADAS ============ -->
@@ -646,7 +712,10 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
           <textarea id="orcObs" rows="2" placeholder="Ex.: Peça decorativa, não recomendada para crianças menores de 3 anos. Pequenas variações de cor e linhas de camada são características do processo."></textarea>
         </div>
 
-        <button class="btn primary" type="button" id="btnPDF" style="align-self:flex-start">Gerar orçamento em PDF</button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap">
+          <button class="btn primary" type="button" id="btnPDF">Gerar orçamento em PDF</button>
+          <button class="btn" type="button" id="btnRegistrar">Registrar como pedido</button>
+        </div>
         <p class="note">Abre a janela de impressão do navegador — escolha <b>“Salvar como PDF”</b> no destino. Deixe os gráficos de fundo ligados para a logo e as cores saírem.</p>
       </div>
     </section>
@@ -718,6 +787,83 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
       </div>
     </section>
   </div>
+
+</div>
+</div>
+
+<!-- ============ PEDIDOS E PAINEL ============ -->
+<div id="viewGestao" hidden>
+
+  <div class="mes-bar">
+    <label class="mes-lab" for="mesSel">Mês</label>
+    <select id="mesSel" style="width:auto; min-width:190px"></select>
+    <button class="btn primary" type="button" id="btnNovoPedido">Registrar o cálculo atual</button>
+  </div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="grid2">
+    <section class="card">
+      <header><h2>Receita por mês</h2><span class="hint">só pedidos pagos</span></header>
+      <div class="body">
+        <div class="cols" id="colsMes"></div>
+        <div class="sub" id="subMeses"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <header><h2>Onde foi a receita do mês</h2><span class="hint" id="hintMes"></span></header>
+      <div class="body">
+        <div class="bar" id="barMes"></div>
+        <table class="legend" id="tabMes"></table>
+      </div>
+    </section>
+  </div>
+
+  <section class="card">
+    <header><h2>Reserva e reinvestimento</h2><span class="hint" id="hintReserva"></span></header>
+    <div class="body">
+      <div class="row">
+        <div class="f">
+          <label for="pctReserva">Reserva para refazer peça</label>
+          <div class="inp"><input type="text" inputmode="decimal" id="pctReserva" data-dec="0" value="5"><span class="suf">% do lucro</span></div>
+          <span class="sub">Cobre peça quebrada no transporte, troca por defeito e reimpressão em garantia.</span>
+        </div>
+        <div class="f">
+          <label for="pctReinvest">Reinvestimento no negócio</label>
+          <div class="inp"><input type="text" inputmode="decimal" id="pctReinvest" data-dec="0" value="20"><span class="suf">% do lucro</span></div>
+          <span class="sub">Filamento, bicos, chapa, segunda impressora.</span>
+        </div>
+        <div class="f">
+          <label>Sobra para você</label>
+          <div class="inp"><input type="text" id="pctVoce" disabled value="75"><span class="suf">%</span></div>
+          <span class="sub">O que resta do lucro líquido depois das duas reservas.</span>
+        </div>
+      </div>
+      <table class="legend" id="tabReserva"></table>
+      <div>
+        <div class="mini-label">Quanto a impressora já se pagou</div>
+        <div class="meter"><span id="meterFill"></span></div>
+        <div class="sub" id="subPayback"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <header>
+      <h2>Pedidos</h2>
+      <span class="hint"><select id="filtroStatus" style="width:auto; padding:4px 8px; font-size:12.5px">
+        <option value="">Todos os status</option>
+        <option value="negociacao">Em negociação</option>
+        <option value="aguardando">Aguardando pagamento</option>
+        <option value="pago">Pago</option>
+        <option value="cancelado">Cancelado</option>
+      </select></span>
+    </header>
+    <div class="body">
+      <div style="overflow-x:auto"><table class="lib" id="tabPedidos"></table></div>
+    </div>
+  </section>
 
 </div>
 </div>
@@ -807,7 +953,7 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
     'fixosMes','horasProdMes','margem','comissao','taxaPagamento','imposto',
     'freteModo','freteValor','qtd1','desc1','qtd2','desc2','qtd3','desc3','precoTeste',
     'orcMarca','orcFone','orcContato','orcDoc','orcCliente','orcClienteContato','orcNumero',
-    'orcPrazo','orcValidade','orcPagamento','orcDescricao','orcObs'];
+    'orcPrazo','orcValidade','orcPagamento','orcDescricao','orcObs','pctReserva','pctReinvest'];
 
   function val(id){ return parseNum($(id).value); }
 
@@ -1083,6 +1229,7 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
     }
 
     salvaEstado();
+    if(!$('viewGestao').hidden) renderGestao();
   }
 
   /* ---------- estado ---------- */
@@ -1138,6 +1285,75 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
     if(idx > -1) a[idx] = reg; else a.push(reg);
     setLib(a);
   });
+
+  /* ---------- pedidos ---------- */
+  var STATUS = {
+    negociacao: 'Em negociação',
+    aguardando: 'Aguardando pagamento',
+    pago: 'Pago',
+    cancelado: 'Cancelado'
+  };
+
+  function pedidos(){ try{ return JSON.parse(load('p3d.pedidos.v1')||'[]'); }catch(e){ return []; } }
+  function setPedidos(a){ store('p3d.pedidos.v1', JSON.stringify(a)); renderGestao(); }
+
+  function hojeISO(){
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  function mesDe(iso){ return (iso||'').slice(0,7); }
+  function mesNome(ym){
+    if(!ym) return '';
+    var p = ym.split('-');
+    var d = new Date(parseInt(p[0],10), parseInt(p[1],10)-1, 1);
+    var s = d.toLocaleDateString('pt-BR',{month:'long', year:'numeric'});
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
+  // Congela os números do cálculo atual: o pedido guarda o que foi cobrado de fato,
+  // não recalcula depois se você mexer no preço do filamento.
+  function novoPedido(){
+    var t = totaisComerciais();
+    var q = r.qtd;
+    var receitaItens = t.subtotal - t.abatimento;
+    var freteCusto = r.modo === 'cliente' ? r.freteCliente : 0;
+    return {
+      id: 'p' + Date.now() + Math.random().toString(36).slice(2,6),
+      data: hojeISO(),
+      cliente: texto('orcCliente') || 'Sem cliente',
+      peca: texto('nomePeca') || 'Peça 3D',
+      qtd: q,
+      status: 'negociacao',
+      receita: t.total,
+      taxas: receitaItens * r.taxas,
+      custoProducao: (r.c.filamento + r.c.purga + r.c.energia + r.c.maquina + r.c.materiais) * q + freteCusto,
+      custoTrabalho: r.c.trabalho * q,
+      custoEstrutura: r.c.estrutura * q,
+      horas: r.tempoUn * q,
+      deprec: r.deprec * q
+    };
+  }
+  function lucroDe(p){
+    return p.receita - p.taxas - p.custoProducao - p.custoTrabalho - p.custoEstrutura;
+  }
+  function custoDePedido(p){
+    return p.taxas + p.custoProducao + p.custoTrabalho + p.custoEstrutura;
+  }
+
+  function resumo(lista){
+    var s = {receita:0, taxas:0, producao:0, trabalho:0, estrutura:0, horas:0, deprec:0, n:lista.length};
+    lista.forEach(function(p){
+      s.receita += p.receita; s.taxas += p.taxas; s.producao += p.custoProducao;
+      s.trabalho += p.custoTrabalho; s.estrutura += p.custoEstrutura;
+      s.horas += p.horas || 0; s.deprec += p.deprec || 0;
+    });
+    s.custoTotal = s.taxas + s.producao + s.trabalho + s.estrutura;
+    s.lucroBruto = s.receita - s.producao - s.trabalho;      // receita menos o custo de produzir
+    s.lucroLiquido = s.lucroBruto - s.taxas - s.estrutura;   // depois de taxas e estrutura
+    s.margem = s.receita > 0 ? s.lucroLiquido/s.receita : 0;
+    s.roi = s.custoTotal > 0 ? s.lucroLiquido/s.custoTotal : 0;
+    return s;
+  }
 
   /* ---------- imagens (logo e foto do produto) ---------- */
   var imgs = { logo:load('p3d.logo') || '', foto:load('p3d.foto') || '' };
@@ -1295,6 +1511,190 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
     }, 700);
   });
 
+  /* ---------- painel de gestão ---------- */
+  function mesesDisponiveis(lista){
+    var set = {};
+    lista.forEach(function(p){ if(p.data) set[mesDe(p.data)] = 1; });
+    set[mesDe(hojeISO())] = 1;
+    return Object.keys(set).sort().reverse();
+  }
+
+  function mesAnterior(ym, n){
+    var p = ym.split('-');
+    var d = new Date(parseInt(p[0],10), parseInt(p[1],10)-1-n, 1);
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+  }
+
+  function renderGestao(){
+    var todos = pedidos();
+    var sel = $('mesSel');
+    var meses = mesesDisponiveis(todos);
+    var atual = sel.value && meses.indexOf(sel.value) > -1 ? sel.value : meses[0];
+    sel.innerHTML = meses.map(function(m){
+      return '<option value="'+m+'"'+(m===atual?' selected':'')+'>'+mesNome(m)+'</option>';
+    }).join('') + '<option value="tudo"'+(sel.value==='tudo'?' selected':'')+'>Tudo desde o início</option>';
+    if(sel.value === 'tudo') atual = 'tudo';
+
+    var noMes = function(p){ return atual === 'tudo' || mesDe(p.data) === atual; };
+    var pagos = todos.filter(function(p){ return p.status === 'pago' && noMes(p); });
+    var s = resumo(pagos);
+    var aguard = resumo(todos.filter(function(p){ return p.status === 'aguardando' && noMes(p); }));
+    var negoc  = resumo(todos.filter(function(p){ return p.status === 'negociacao' && noMes(p); }));
+
+    // ---- tiles
+    var plural = function(n, um, muitos){ return n + ' ' + (n === 1 ? um : muitos); };
+    var tiles = [
+      {k:'Receita recebida', v:money(s.receita), cls:'accent', n:plural(s.n,'pedido pago','pedidos pagos')},
+      {k:'Lucro bruto', v:money(s.lucroBruto), cls:'', n:'receita menos filamento, energia, máquina e seu trabalho'},
+      {k:'Lucro líquido', v:money(s.lucroLiquido), cls:(s.lucroLiquido>=0?'good':'bad'), n:'depois de taxas e custos fixos'},
+      {k:'Margem líquida', v:num(s.margem*100,1)+'%', cls:(s.margem>=0?'':'bad'), n:'do que entrou, sobrou isso'},
+      {k:'Retorno sobre o custo', v:num(s.roi*100,0)+'%', cls:(s.roi>=0?'good':'bad'), n:'cada R$ 1 gasto virou '+money(1+s.roi)},
+      {k:'A receber', v:money(aguard.receita), cls:'', n:plural(aguard.n,'pedido aguardando','pedidos aguardando')+' pagamento'},
+      {k:'Em negociação', v:money(negoc.receita), cls:'', n:plural(negoc.n,'proposta em aberto','propostas em aberto')},
+      {k:'Horas de máquina', v:num(s.horas,1)+' h', cls:'', n:s.horas>0 ? money(s.lucroLiquido/s.horas)+' de lucro por hora' : 'nenhuma impressão paga'}
+    ];
+    $('tiles').innerHTML = tiles.map(function(t){
+      return '<div class="tile"><div class="k">'+t.k+'</div><div class="v '+t.cls+'">'+t.v+'</div><div class="n">'+t.n+'</div></div>';
+    }).join('');
+
+    $('tabBadge').textContent = (negoc.n + aguard.n) > 0
+      ? money(aguard.receita + negoc.receita) + ' em aberto' : '';
+
+    // ---- colunas de receita por mês
+    var base = atual === 'tudo' ? mesDe(hojeISO()) : atual;
+    var serie = [];
+    for(var i = 5; i >= 0; i--){
+      var m = mesAnterior(base, i);
+      serie.push({ m:m, v:resumo(todos.filter(function(p){ return p.status === 'pago' && mesDe(p.data) === m; })).receita });
+    }
+    var topo = Math.max.apply(null, serie.map(function(x){ return x.v; }).concat([1]));
+    // Rótulo direto só no mês selecionado e no melhor mês; o resto fica no hover.
+    $('colsMes').innerHTML = serie.map(function(x){
+      var alt = Math.max(2, Math.round(x.v/topo*100));
+      var mostra = x.v > 0 && (x.m === base || x.v === topo);
+      return '<div class="cl'+(x.m===base?' atual':'')+'" title="'+mesNome(x.m)+': '+money(x.v)+'">'+
+        '<span class="vl">'+(mostra ? money(x.v) : '')+'</span>'+
+        '<span class="bx" style="height:'+alt+'%"></span>'+
+        '<span class="lb">'+x.m.slice(5)+'/'+x.m.slice(2,4)+'</span></div>';
+    }).join('');
+    var totalSerie = serie.reduce(function(k,x){ return k + x.v; }, 0);
+    $('subMeses').textContent = totalSerie > 0
+      ? 'Últimos 6 meses · ' + money(totalSerie) + ' no período. Passe o mouse em cada coluna para ver o valor.'
+      : 'Ainda sem receita registrada. Marque um pedido como pago para ele aparecer aqui.';
+
+    // ---- composição da receita do mês
+    var itens = [
+      {nome:'Custo de produção', cor:'var(--neutral-mark)', v:s.producao},
+      {nome:'Seu trabalho',      cor:'var(--s1)',           v:s.trabalho},
+      {nome:'Estrutura e falhas',cor:'var(--s3)',           v:s.estrutura},
+      {nome:'Taxas e impostos',  cor:'var(--s7)',           v:s.taxas},
+      {nome:'Lucro líquido',     cor:'var(--good)',         v:Math.max(0,s.lucroLiquido)}
+    ];
+    desenhaBarra($('barMes'), itens, s.receita);
+    desenhaTabela($('tabMes'), itens, s.receita, 'Receita recebida');
+    $('hintMes').textContent = atual === 'tudo' ? 'desde o início' : mesNome(atual);
+
+    // ---- reserva e reinvestimento
+    var pR = Math.max(0, val('pctReserva'))/100, pI = Math.max(0, val('pctReinvest'))/100;
+    if(pR + pI > 1){ pI = Math.max(0, 1 - pR); }
+    $('pctVoce').value = num(Math.max(0, (1 - pR - pI))*100, 0);
+    var lucroPos = Math.max(0, s.lucroLiquido);
+    var itensRes = [
+      {nome:'Reserva para refazer peça', cor:'var(--s7)', v:lucroPos*pR},
+      {nome:'Reinvestimento no negócio', cor:'var(--s1)', v:lucroPos*pI},
+      {nome:'Sobra para você',           cor:'var(--good)', v:lucroPos*(1-pR-pI)}
+    ];
+    desenhaTabela($('tabReserva'), itensRes, lucroPos, 'Lucro líquido do período');
+    $('hintReserva').textContent = money(lucroPos*(pR+pI)) + ' guardado';
+
+    // ---- payback da impressora
+    var todosPagos = resumo(todos.filter(function(p){ return p.status === 'pago'; }));
+    var invest = val('precoMaquina');
+    var pago = invest > 0 ? Math.min(1, todosPagos.lucroLiquido/invest) : 0;
+    $('meterFill').style.width = Math.max(0, pago*100) + '%';
+    $('subPayback').textContent = invest > 0
+      ? money(todosPagos.lucroLiquido) + ' de lucro acumulado sobre ' + money(invest) + ' investidos — ' +
+        (todosPagos.lucroLiquido >= invest
+          ? 'a impressora já se pagou ' + num(todosPagos.lucroLiquido/invest,1) + '×.'
+          : 'faltam ' + money(invest - todosPagos.lucroLiquido) + '.')
+      : 'Informe o investimento na máquina no bloco 03 da calculadora.';
+
+    // ---- tabela de pedidos
+    var filtro = $('filtroStatus').value;
+    var lista = todos.filter(function(p){ return noMes(p) && (!filtro || p.status === filtro); })
+                     .sort(function(a,b){ return (b.data||'').localeCompare(a.data||'') || b.id.localeCompare(a.id); });
+    var t = $('tabPedidos');
+    if(!lista.length){
+      t.innerHTML = '<tbody><tr><td class="empty">Nenhum pedido aqui. Calcule uma peça e clique em “Registrar o cálculo atual”.</td></tr></tbody>';
+      return;
+    }
+    t.innerHTML =
+      '<thead><tr><th>Data</th><th>Cliente</th><th>Peça</th><th class="n">Qtd</th><th class="n">Receita</th>'+
+      '<th class="n">Lucro</th><th>Status</th><th></th></tr></thead><tbody>' +
+      lista.map(function(p){
+        var l = lucroDe(p);
+        return '<tr>'+
+          '<td><input type="date" class="dt" data-id="'+p.id+'" value="'+(p.data||'')+'"></td>'+
+          '<td>'+escapa(p.cliente)+'</td>'+
+          '<td>'+escapa(p.peca)+'</td>'+
+          '<td class="n">'+p.qtd+'</td>'+
+          '<td class="n">'+money(p.receita)+'</td>'+
+          '<td class="n" style="color:'+(l>=0?'var(--good)':'var(--bad)')+'">'+money(l)+'</td>'+
+          '<td><select class="st" data-id="'+p.id+'">'+
+            Object.keys(STATUS).map(function(k){
+              return '<option value="'+k+'"'+(p.status===k?' selected':'')+'>'+STATUS[k]+'</option>';
+            }).join('')+
+          '</select></td>'+
+          '<td><div class="acts"><button class="btn tiny ghost" data-rm="'+p.id+'" type="button">Excluir</button></div></td></tr>';
+      }).join('') + '</tbody>';
+  }
+
+  $('tabPedidos').addEventListener('change', function(e){
+    var el = e.target, id = el.dataset.id;
+    if(!id) return;
+    var a = pedidos(), p = a.find(function(x){ return x.id === id; });
+    if(!p) return;
+    if(el.classList.contains('st')) p.status = el.value;
+    if(el.classList.contains('dt')) p.data = el.value || hojeISO();
+    setPedidos(a);
+  });
+  $('tabPedidos').addEventListener('click', function(e){
+    var b = e.target.closest('button[data-rm]');
+    if(!b) return;
+    setPedidos(pedidos().filter(function(p){ return p.id !== b.dataset.rm; }));
+  });
+  $('mesSel').addEventListener('change', renderGestao);
+  $('filtroStatus').addEventListener('change', renderGestao);
+
+  function registraPedido(btn, rotulo){
+    if(!texto('nomePeca')){
+      trocaAba('calc');
+      $('nomePeca').focus();
+      $('nomePeca').placeholder = 'Dê um nome à peça antes de registrar o pedido';
+      return;
+    }
+    var a = pedidos();
+    a.push(novoPedido());
+    setPedidos(a);
+    btn.textContent = 'Pedido registrado';
+    setTimeout(function(){ btn.textContent = rotulo; }, 1800);
+  }
+  $('btnNovoPedido').addEventListener('click', function(){ registraPedido(this, 'Registrar o cálculo atual'); });
+  $('btnRegistrar').addEventListener('click', function(){ registraPedido(this, 'Registrar como pedido'); });
+
+  /* ---------- abas ---------- */
+  function trocaAba(qual){
+    var gestao = qual === 'gestao';
+    $('viewCalc').hidden = gestao;
+    $('viewGestao').hidden = !gestao;
+    $('tabCalc').classList.toggle('on', !gestao);
+    $('tabGestao').classList.toggle('on', gestao);
+    if(gestao) renderGestao();
+    store('p3d.aba', qual);
+  }
+  $('tabCalc').addEventListener('click', function(){ trocaAba('calc'); });
+  $('tabGestao').addEventListener('click', function(){ trocaAba('gestao'); });
+
   /* ---------- ações ---------- */
   $('btnCopy').addEventListener('click', function(){
     var nome = $('nomePeca').value.trim() || 'Peça 3D';
@@ -1315,7 +1715,7 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
   });
 
   $('btnExport').addEventListener('click', function(){
-    var blob = new Blob([JSON.stringify({estado:estado(), lib:lib(), imgs:imgs}, null, 2)], {type:'application/json'});
+    var blob = new Blob([JSON.stringify({estado:estado(), lib:lib(), imgs:imgs, pedidos:pedidos()}, null, 2)], {type:'application/json'});
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url; a.download = 'precifica-3d.json'; a.click();
@@ -1330,6 +1730,7 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
       try{
         var o = JSON.parse(fr.result);
         if(o.lib) setLib(o.lib);
+        if(o.pedidos) setPedidos(o.pedidos);
         if(o.imgs){
           if(o.imgs.logo !== undefined) guardaImagem('logo', o.imgs.logo, $('btnLogo'), 'Trocar');
           if(o.imgs.foto !== undefined) guardaImagem('foto', o.imgs.foto, $('btnFoto'), 'Trocar');
@@ -1380,5 +1781,7 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
   aplicaImagens();
   renderLib();
   render();
+  renderGestao();
+  trocaAba(load('p3d.aba') === 'gestao' ? 'gestao' : 'calc');
 })();
 </script>
