@@ -1,6 +1,6 @@
 # Precifica 3D
 
-Calculadora de precificação para impressão 3D sob encomenda. Página única em HTML, sem dependências, sem build e sem servidor: baixe `calculadora-precificacao-3d.html` e abra no navegador.
+Calculadora de precificação para impressão 3D sob encomenda. Página única em HTML, sem dependências, sem build e sem servidor: baixe `index.html` e abra no navegador, ou publique a pasta em qualquer hospedagem estática (Vercel, Netlify, GitHub Pages) sem nenhuma configuração.
 
 Feita para quem imprime peças coloridas em impressora com sistema multicor (AMS/ACE), onde a purga de troca de cor costuma pesar tanto quanto a própria peça.
 
