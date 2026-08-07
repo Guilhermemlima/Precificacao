@@ -1,0 +1,996 @@
+<title>Calculadora de Precificação 3D</title>
+<style>
+/* ---------- tokens ---------- */
+:root{
+  color-scheme: light;
+  --plane:#e8ebee; --surface:#fbfbfc; --surface-2:#f1f3f5; --surface-3:#e9edf1;
+  --ink:#10151b; --ink-2:#4a5560; --muted:#7c8794;
+  --line:#dde2e7; --line-strong:#c6ced6;
+  --accent:#dc4f08; --accent-soft:#fdece2; --on-accent:#ffffff;
+  --good:#0f7a34; --bad:#c0392b; --warn:#a86400;
+  --s1:#2a78d6; --s2:#1baf7a; --s3:#eda100; --s4:#e87ba4; --s5:#008300; --s6:#4a3aa7; --s7:#e34948;
+  --neutral-mark:#757b85;
+  --shadow:0 1px 2px rgba(16,21,27,.06), 0 8px 24px -16px rgba(16,21,27,.28);
+  --font-display:"Bahnschrift","DIN Alternate","Roboto Condensed","Arial Narrow",system-ui,sans-serif;
+  --font-ui:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",sans-serif;
+  --font-mono:"Cascadia Mono",Consolas,ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme: dark;
+    --plane:#0e1216; --surface:#171b21; --surface-2:#1e242c; --surface-3:#242b34;
+    --ink:#f2f5f8; --ink-2:#a9b4c0; --muted:#79838f;
+    --line:#2a313a; --line-strong:#3b444f;
+    --accent:#ff7a2f; --accent-soft:#2c1a10; --on-accent:#160b04;
+    --good:#35c46a; --bad:#ff6b6b; --warn:#e8a33d;
+    --s1:#3987e5; --s2:#199e70; --s3:#c98500; --s4:#d55181; --s5:#008300; --s6:#9085e9; --s7:#e66767;
+    --neutral-mark:#7d8593;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.9);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --plane:#0e1216; --surface:#171b21; --surface-2:#1e242c; --surface-3:#242b34;
+  --ink:#f2f5f8; --ink-2:#a9b4c0; --muted:#79838f;
+  --line:#2a313a; --line-strong:#3b444f;
+  --accent:#ff7a2f; --accent-soft:#2c1a10; --on-accent:#160b04;
+  --good:#35c46a; --bad:#ff6b6b; --warn:#e8a33d;
+  --s1:#3987e5; --s2:#199e70; --s3:#c98500; --s4:#d55181; --s5:#008300; --s6:#9085e9; --s7:#e66767;
+  --neutral-mark:#7d8593;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.9);
+}
+:root[data-theme="light"]{
+  color-scheme: light;
+  --plane:#e8ebee; --surface:#fbfbfc; --surface-2:#f1f3f5; --surface-3:#e9edf1;
+  --ink:#10151b; --ink-2:#4a5560; --muted:#7c8794;
+  --line:#dde2e7; --line-strong:#c6ced6;
+  --accent:#dc4f08; --accent-soft:#fdece2; --on-accent:#ffffff;
+  --good:#0f7a34; --bad:#c0392b; --warn:#a86400;
+  --s1:#2a78d6; --s2:#1baf7a; --s3:#eda100; --s4:#e87ba4; --s5:#008300; --s6:#4a3aa7; --s7:#e34948;
+  --neutral-mark:#757b85;
+}
+
+/* ---------- base ---------- */
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--plane); color:var(--ink);
+  font-family:var(--font-ui); font-size:15px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{margin:0; text-wrap:balance; font-family:var(--font-display); font-weight:600; letter-spacing:.01em}
+button{font:inherit; cursor:pointer}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:3px}
+.wrap{max-width:1320px; margin:0 auto; padding:0 20px 72px}
+
+/* ---------- header ---------- */
+header.top{
+  position:relative; background:var(--surface); border-bottom:1px solid var(--line);
+  overflow:hidden;
+}
+header.top::after{
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(to bottom, transparent 0 3px, var(--line-strong) 3px 4px);
+  opacity:.22; mask-image:linear-gradient(to bottom, transparent, black 140%);
+}
+.top-inner{position:relative; z-index:1; max-width:1320px; margin:0 auto; padding:22px 20px 20px;
+  display:flex; align-items:flex-end; gap:20px; flex-wrap:wrap; justify-content:space-between}
+.brand{display:flex; align-items:center; gap:12px}
+.nozzle{width:26px; height:34px; flex:none}
+.brand h1{font-size:26px; line-height:1.05; letter-spacing:.02em; text-transform:uppercase}
+.brand p{margin:2px 0 0; font-size:12.5px; color:var(--muted); letter-spacing:.06em; text-transform:uppercase; font-family:var(--font-display)}
+.top-actions{display:flex; gap:8px; flex-wrap:wrap}
+
+/* ---------- controls ---------- */
+.btn{
+  background:var(--surface-2); color:var(--ink); border:1px solid var(--line-strong);
+  border-radius:7px; padding:8px 13px; font-size:13.5px; font-weight:600;
+  display:inline-flex; align-items:center; gap:7px; transition:background .14s, border-color .14s, transform .08s;
+}
+.btn:hover{background:var(--surface-3); border-color:var(--muted)}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--accent); border-color:var(--accent); color:var(--on-accent)}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.ghost{background:transparent}
+.btn.tiny{padding:4px 9px; font-size:12px; border-radius:6px}
+
+/* ---------- layout ---------- */
+.grid{display:grid; grid-template-columns:minmax(0,1fr) 420px; gap:22px; align-items:start; margin-top:22px}
+@media (max-width:1080px){ .grid{grid-template-columns:1fr} }
+.col-in{display:flex; flex-direction:column; gap:16px; min-width:0}
+
+/* ---------- cards ---------- */
+.card{background:var(--surface); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow)}
+.card > header{
+  display:flex; align-items:baseline; gap:10px; padding:13px 16px 11px;
+  border-bottom:1px solid var(--line);
+}
+.card > header .idx{
+  font-family:var(--font-mono); font-size:11px; color:var(--accent); font-weight:700;
+  border:1px solid var(--accent); border-radius:4px; padding:1px 5px; flex:none;
+}
+.card > header h2{font-size:15.5px; letter-spacing:.07em; text-transform:uppercase}
+.card > header .hint{margin-left:auto; font-size:12px; color:var(--muted); text-align:right}
+.card .body{padding:15px 16px 17px; display:flex; flex-direction:column; gap:14px}
+
+/* ---------- fields ---------- */
+.row{display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:12px}
+.f{display:flex; flex-direction:column; gap:5px; min-width:0}
+.f label{font-size:12px; color:var(--ink-2); font-weight:600; letter-spacing:.015em}
+.f .sub{font-size:11.5px; color:var(--muted); line-height:1.35}
+.inp{display:flex; align-items:center; background:var(--surface-2); border:1px solid var(--line-strong); border-radius:8px;
+  transition:border-color .14s, background .14s}
+.inp:focus-within{border-color:var(--accent); background:var(--surface)}
+.inp .pre,.inp .suf{font-family:var(--font-mono); font-size:12px; color:var(--muted); padding:0 9px; flex:none; white-space:nowrap}
+.inp .pre{border-right:1px solid var(--line)}
+.inp .suf{border-left:1px solid var(--line)}
+.inp input{
+  width:100%; min-width:0; border:0; background:transparent; color:var(--ink);
+  font-family:var(--font-mono); font-size:14.5px; padding:9px 10px; text-align:right;
+  font-variant-numeric:tabular-nums;
+}
+.inp input:focus{outline:none}
+.inp input[type=text].txt{text-align:left; font-family:var(--font-ui)}
+select{
+  width:100%; background:var(--surface-2); color:var(--ink); border:1px solid var(--line-strong);
+  border-radius:8px; padding:9px 10px; font-size:14px; font-family:var(--font-ui);
+}
+select:focus{outline:none; border-color:var(--accent)}
+.timepair{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+.note{
+  font-size:12.5px; color:var(--ink-2); background:var(--surface-2); border-left:2px solid var(--accent);
+  padding:9px 12px; border-radius:0 7px 7px 0; line-height:1.45;
+}
+.note b{color:var(--ink)}
+
+/* ---------- results ---------- */
+.panel{position:sticky; top:16px; display:flex; flex-direction:column; gap:14px}
+@media (max-width:1080px){ .panel{position:static} }
+.hero{padding:18px 18px 16px}
+.hero .eyebrow{font-family:var(--font-display); font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted)}
+.price{font-size:52px; font-weight:700; line-height:1.02; color:var(--accent); letter-spacing:-.015em; margin-top:2px}
+.price small{font-size:22px; font-weight:600; margin-right:6px}
+.price-sub{font-size:12.5px; color:var(--ink-2); margin-top:4px}
+.roundbox{margin-top:12px; display:flex; gap:8px; flex-wrap:wrap}
+.chip{
+  border:1px solid var(--line-strong); background:var(--surface-2); border-radius:999px;
+  padding:4px 11px; font-size:12.5px; color:var(--ink-2); font-family:var(--font-mono);
+}
+.chip b{color:var(--ink); font-weight:700}
+.stats{display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line); border-top:1px solid var(--line)}
+.stat{background:var(--surface); padding:11px 16px}
+.stat .k{font-size:11.5px; color:var(--muted); letter-spacing:.03em}
+.stat .v{font-family:var(--font-mono); font-size:19px; font-weight:600; font-variant-numeric:tabular-nums; margin-top:1px}
+.stat .v.good{color:var(--good)} .stat .v.bad{color:var(--bad)}
+.alert{display:none; margin:0 16px 14px; padding:9px 12px; border-radius:8px; font-size:12.5px; line-height:1.4;
+  background:var(--accent-soft); border:1px solid var(--accent); color:var(--ink)}
+.alert.on{display:block}
+
+/* ---------- chart ---------- */
+.bar{display:flex; gap:2px; height:22px; background:var(--surface); border-radius:0 4px 4px 0; overflow:visible}
+.bar > span{min-width:2px; transition:filter .12s}
+.bar > span:last-child{border-radius:0 4px 4px 0}
+.bar > span:hover{filter:brightness(1.15)}
+.legend{width:100%; border-collapse:collapse; margin-top:12px; font-size:13px}
+.legend th{
+  text-align:left; font-weight:600; font-size:11px; letter-spacing:.09em; text-transform:uppercase;
+  color:var(--muted); padding:0 0 6px; border-bottom:1px solid var(--line); font-family:var(--font-display);
+}
+.legend th.n, .legend td.n{text-align:right; font-family:var(--font-mono); font-variant-numeric:tabular-nums}
+.legend td{padding:6px 0; border-bottom:1px solid var(--line); color:var(--ink-2)}
+.legend tr:last-child td{border-bottom:0}
+.legend td.name{color:var(--ink); display:flex; align-items:center; gap:8px}
+.sw{width:10px; height:10px; border-radius:2px; flex:none}
+.legend tfoot td{font-weight:700; color:var(--ink); border-top:1px solid var(--line-strong); border-bottom:0; padding-top:8px}
+.mini-label{font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-family:var(--font-display); margin-bottom:7px}
+
+#tip{
+  position:fixed; z-index:50; pointer-events:none; opacity:0; transition:opacity .1s;
+  background:var(--ink); color:var(--surface); font-size:12px; font-family:var(--font-mono);
+  padding:5px 9px; border-radius:6px; white-space:nowrap;
+}
+#tip.on{opacity:1}
+
+/* ---------- library ---------- */
+.lib{width:100%; border-collapse:collapse; font-size:13px}
+.lib th{text-align:left; font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted);
+  padding:0 8px 6px 0; border-bottom:1px solid var(--line); font-family:var(--font-display)}
+.lib td{padding:8px 8px 8px 0; border-bottom:1px solid var(--line); vertical-align:middle}
+.lib td.n{font-family:var(--font-mono); font-variant-numeric:tabular-nums; text-align:right}
+.lib tr:last-child td{border-bottom:0}
+.lib .acts{display:flex; gap:6px; justify-content:flex-end}
+.empty{color:var(--muted); font-size:13px; padding:6px 0}
+
+footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--muted); font-size:12.5px; line-height:1.6}
+@media (prefers-reduced-motion: reduce){ *{transition:none !important} }
+</style>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <svg class="nozzle" viewBox="0 0 26 34" aria-hidden="true">
+        <path d="M4 2h18v11l-5 7v6h-8v-6l-5-7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M13 27v5" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <h1>Precifica 3D</h1>
+        <p>Custo real por peça &middot; margem &middot; preço de venda</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="btn" id="btnTheme" type="button">Tema</button>
+      <button class="btn" id="btnCopy" type="button">Copiar orçamento</button>
+      <button class="btn" id="btnExport" type="button">Exportar</button>
+      <button class="btn" id="btnImport" type="button">Importar</button>
+      <button class="btn primary" id="btnSave" type="button">Salvar peça</button>
+      <input type="file" id="fileIn" accept="application/json" hidden>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+<div class="grid">
+
+  <!-- ============ ENTRADAS ============ -->
+  <div class="col-in">
+
+    <section class="card">
+      <header><span class="idx">01</span><h2>A peça</h2><span class="hint" id="hintPeca"></span></header>
+      <div class="body">
+        <div class="row">
+          <div class="f" style="grid-column:1/-1">
+            <label for="nomePeca">Nome da peça</label>
+            <div class="inp"><input class="txt" type="text" id="nomePeca" placeholder="Ex.: Groot 12 cm colorido"></div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="f">
+            <label>Tempo de impressão</label>
+            <div class="timepair">
+              <div class="inp"><input type="text" inputmode="decimal" id="horas" data-dec="0" value="4"><span class="suf">h</span></div>
+              <div class="inp"><input type="text" inputmode="decimal" id="minutos" data-dec="0" value="30"><span class="suf">min</span></div>
+            </div>
+            <span class="sub">Tempo total da impressão, direto do fatiador.</span>
+          </div>
+          <div class="f">
+            <label for="gramasPeca">Filamento na peça</label>
+            <div class="inp"><input type="text" inputmode="decimal" id="gramasPeca" data-dec="1" value="45"><span class="suf">g</span></div>
+            <span class="sub">Peso do modelo + suportes.</span>
+          </div>
+          <div class="f">
+            <label for="gramasPurga">Purga / desperdício</label>
+            <div class="inp"><input type="text" inputmode="decimal" id="gramasPurga" data-dec="1" value="30"><span class="suf">g</span></div>
+            <span class="sub">Torre de purga e troca de cor do ACE. Em multicor costuma passar de 50% do peso da peça.</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="f">
+            <label for="pecasPorLote">Peças por impressão</label>
+            <div class="inp"><input type="text" inputmode="decimal" id="pecasPorLote" data-dec="0" value="1"><span class="suf">un</span></div>
+            <span class="sub">Quantas peças saem nessa mesma mesa. Divide tempo, energia e purga.</span>
+          </div>
+          <div class="f">
+            <label for="taxaFalha">Taxa de falha</label>
+            <div class="inp"><input type="text" inputmode="decimal" id="taxaFalha" data-dec="1" value="7"><span class="suf">%</span></div>
+            <span class="sub">Reserva para impressões perdidas. 5–10% é realista.</span>
+          </div>
+          <div class="f">
+            <label for="quantidade">Quantidade do pedido</label>
+            <div class="inp"><input type="text" inputmode="decimal" id="quantidade" data-dec="0" value="1"><span class="suf">un</span></div>
+            <span class="sub">Só afeta o total do orçamento.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <header><span class="idx">02</span><h2>Filamento</h2><span class="hint" id="hintFil"></span></header>
+      <div class="body">
+        <div class="row">
+          <div class="f">
+            <label for="tipoFilamento">Tipo</label>
+            <select id="tipoFilamento">
+              <option value="110">PLA comum</option>
+              <option value="150">PLA Silk / Matte</option>
+              <option value="180">PLA+ / High Speed</option>
+              <option value="140">PETG</option>
+              <option value="160">ABS / ASA</option>
+              <option value="220">TPU flexível</option>
+              <option value="0">Outro (preço manual)</option>
+            </select>
+            <span class="sub">Só sugere um preço — ajuste sempre pelo que você paga.</span>
+          </div>
+          <div class="f">
+            <label for="precoKg">Preço do quilo</label>
+            <div class="inp"><span class="pre">R$</span><input type="text" inputmode="decimal" id="precoKg" data-dec="2" value="110,00"><span class="suf">/kg</span></div>
+            <span class="sub">Preço de reposição, com frete.</span>
+          </div>
+        </div>
+        <p class="note">Os filamentos que vieram no combo <b>não são de graça</b>: lance o preço que você vai pagar para repor. Se precificar como zero, o lucro de hoje some quando o rolo acabar.</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <header><span class="idx">03</span><h2>Máquina e energia</h2><span class="hint" id="hintMaq"></span></header>
+      <div class="body">
+        <div class="row">
+          <div class="f">
+            <label for="precoMaquina">Investimento na máquina</label>
+            <div class="inp"><span class="pre">R$</span><input type="text" inputmode="decimal" id="precoMaquina" data-dec="2" value="2.500,00"></div>
+            <span class="sub">Impressora + ACE + acessórios.</span>
+          </div>
+          <div class="f">
+            <label for="vidaUtil">Vida útil estimada</label>
+            <div class="inp"><input type="text" inputmode="decimal" id="vidaUtil" data-dec="0" value="6000"><span class="suf">h</span></div>
+            <span class="sub">6.000 h é uma estimativa conservadora.</span>
+          </div>
+          <div class="f">
+            <label for="manutHora">Manutenção e peças</label>
+            <div class="inp"><span class="pre">R$</span><input type="text" inputmode="decimal" id="manutHora" data-dec="2" value="0,25"><span class="suf">/h</span></div>
+            <span class="sub">Bicos, chapa, correias, cortador de filamento, limpeza.</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="f">
+            <label for="potencia">Consumo médio</label>
+            <div class="inp"><input type="text" inputmode="decimal" id="potencia" data-dec="0" value="130"><span class="suf">W</span></div>
+            <span class="sub">Média real, não o pico. PLA com mesa a 60 °C fica em torno de 110–150 W.</span>
+          </div>
+          <div class="f">
+            <label for="tarifa">Tarifa de energia</label>
+            <div class="inp"><span class="pre">R$</span><input type="text" inputmode="decimal" id="tarifa" data-dec="3" value="0,950"><span class="suf">/kWh</span></div>
+            <span class="sub">Some impostos e bandeira — está na sua conta de luz.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <header><span class="idx">04</span><h2>Seu trabalho e materiais</h2><span class="hint" id="hintTrab"></span></header>
+      <div class="body">
+        <div class="row">
+          <div class="f">
+            <label for="minutosTrabalho">Tempo de trabalho por peça</label>
+            <div class="inp"><input type="text" inputmode="decimal" id="minutosTrabalho" data-dec="0" value="15"><span class="suf">min</span></div>
+            <span class="sub">Fatiar, preparar a mesa, retirar suporte, lixar, embalar.</span>
+          </div>
+          <div class="f">
+            <label for="valorHora">Valor da sua hora</label>
+            <div class="inp"><span class="pre">R$</span><input type="text" inputmode="decimal" id="valorHora" data-dec="2" value="30,00"><span class="suf">/h</span></div>
+            <span class="sub">Isto é salário, não lucro. Cobre mesmo assim.</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="f">
+            <label for="custoPintura">Pintura e acabamento</label>
+            <div class="inp"><span class="pre">R$</span><input type="text" inputmode="decimal" id="custoPintura" data-dec="2" value="0,00"></div>
+            <span class="sub">Tinta, primer, verniz, lixa, cola.</span>
+          </div>
+          <div class="f">
+            <label for="custoExtras">Itens extras</label>
+            <div class="inp"><span class="pre">R$</span><input type="text" inputmode="decimal" id="custoExtras" data-dec="2" value="0,00"></div>
+            <span class="sub">Ímã, base, LED, olhos, plaquinha.</span>
+          </div>
+          <div class="f">
+            <label for="custoEmbalagem">Embalagem</label>
+            <div class="inp"><span class="pre">R$</span><input type="text" inputmode="decimal" id="custoEmbalagem" data-dec="2" value="1,50"></div>
+            <span class="sub">Caixa, plástico bolha, etiqueta, cartão.</span>
+          </div>
+        </div>
+        <p class="note">Peça pintada à mão pode levar mais tempo de pincel do que de impressão. Se a pintura leva 40 minutos, lance <b>40</b> aqui — senão você paga para trabalhar.</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <header><span class="idx">05</span><h2>Custos fixos do negócio</h2><span class="hint" id="hintFix"></span></header>
+      <div class="body">
+        <div class="row">
+          <div class="f">
+            <label for="fixosMes">Custos fixos por mês</label>
+            <div class="inp"><span class="pre">R$</span><input type="text" inputmode="decimal" id="fixosMes" data-dec="2" value="0,00"></div>
+            <span class="sub">Internet, software, anúncios, DAS do MEI, espaço.</span>
+          </div>
+          <div class="f">
+            <label for="horasProdMes">Horas de impressão por mês</label>
+            <div class="inp"><input type="text" inputmode="decimal" id="horasProdMes" data-dec="0" value="120"><span class="suf">h</span></div>
+            <span class="sub">Quanto a máquina realmente roda. Serve para ratear os fixos.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <header><span class="idx">06</span><h2>Venda: margem e taxas</h2><span class="hint" id="hintVenda"></span></header>
+      <div class="body">
+        <div class="row">
+          <div class="f">
+            <label for="margem">Margem sobre o custo</label>
+            <div class="inp"><input type="text" inputmode="decimal" id="margem" data-dec="0" value="120"><span class="suf">%</span></div>
+            <span class="sub">120% = preço 2,2× o custo. Colecionável costuma sustentar 100–200%.</span>
+          </div>
+          <div class="f">
+            <label for="comissao">Comissão da plataforma</label>
+            <div class="inp"><input type="text" inputmode="decimal" id="comissao" data-dec="1" value="0"><span class="suf">%</span></div>
+            <span class="sub">Shopee ≈ 14–20%, Mercado Livre ≈ 12–17%, venda direta 0%.</span>
+          </div>
+          <div class="f">
+            <label for="taxaPagamento">Taxa de pagamento</label>
+            <div class="inp"><input type="text" inputmode="decimal" id="taxaPagamento" data-dec="1" value="0"><span class="suf">%</span></div>
+            <span class="sub">Maquininha ou link de pagamento. Pix normalmente 0%.</span>
+          </div>
+          <div class="f">
+            <label for="imposto">Imposto sobre a venda</label>
+            <div class="inp"><input type="text" inputmode="decimal" id="imposto" data-dec="1" value="0"><span class="suf">%</span></div>
+            <span class="sub">MEI paga valor fixo mensal — deixe 0 e lance o DAS nos custos fixos.</span>
+          </div>
+        </div>
+        <p class="note">As taxas incidem sobre o <b>preço</b>, não sobre o custo. A conta já embute isso: o preço sugerido sobe o suficiente para você receber a margem cheia depois de descontada a comissão.</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <header><span class="idx">07</span><h2>Frete e entrega</h2><span class="hint" id="hintFrete"></span></header>
+      <div class="body">
+        <div class="row">
+          <div class="f">
+            <label for="freteModo">Quem paga o frete</label>
+            <select id="freteModo">
+              <option value="cliente">O cliente paga à parte</option>
+              <option value="embutido">Embutido no preço (frete grátis)</option>
+              <option value="retirada">Retirada em mãos / sem frete</option>
+            </select>
+            <span class="sub">Embutido, o frete vira custo e ainda paga comissão — o preço sobe para compensar.</span>
+          </div>
+          <div class="f">
+            <label for="freteValor">Valor do frete</label>
+            <div class="inp"><span class="pre">R$</span><input type="text" inputmode="decimal" id="freteValor" data-dec="2" value="0,00"></div>
+            <span class="sub">Por envio, não por peça. É rateado entre as unidades do pedido.</span>
+          </div>
+        </div>
+        <p class="note">Frete grátis não é desconto, é custo: num pedido de 1 peça o envio inteiro cai na sua margem. Aumente a quantidade do pedido e veja o custo por peça cair na tabela ao lado.</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <header><span class="idx">08</span><h2>Desconto por quantidade</h2><span class="hint" id="hintDesc"></span></header>
+      <div class="body">
+        <div class="row">
+          <div class="f">
+            <label for="qtd1">A partir de</label>
+            <div class="timepair">
+              <div class="inp"><input type="text" inputmode="decimal" id="qtd1" data-dec="0" value="3"><span class="suf">un</span></div>
+              <div class="inp"><input type="text" inputmode="decimal" id="desc1" data-dec="0" value="5"><span class="suf">%</span></div>
+            </div>
+          </div>
+          <div class="f">
+            <label for="qtd2">A partir de</label>
+            <div class="timepair">
+              <div class="inp"><input type="text" inputmode="decimal" id="qtd2" data-dec="0" value="5"><span class="suf">un</span></div>
+              <div class="inp"><input type="text" inputmode="decimal" id="desc2" data-dec="0" value="10"><span class="suf">%</span></div>
+            </div>
+          </div>
+          <div class="f">
+            <label for="qtd3">A partir de</label>
+            <div class="timepair">
+              <div class="inp"><input type="text" inputmode="decimal" id="qtd3" data-dec="0" value="10"><span class="suf">un</span></div>
+              <div class="inp"><input type="text" inputmode="decimal" id="desc3" data-dec="0" value="15"><span class="suf">%</span></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="mini-label">O que sobra em cada faixa</div>
+          <div style="overflow-x:auto"><table class="lib" id="tabFaixas"></table></div>
+        </div>
+        <p class="note">O desconto sai inteiro do seu lucro — o custo não cai sozinho. Só o que cai de verdade é o frete rateado e o tempo de máquina quando você <b>imprime várias peças na mesma mesa</b> (campo “peças por impressão”). Ajuste ele antes de prometer desconto.</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <header><span class="idx">09</span><h2>Testar um preço</h2><span class="hint">Quanto sobra se eu cobrar…</span></header>
+      <div class="body">
+        <div class="row">
+          <div class="f">
+            <label for="precoTeste">Preço que pretendo cobrar</label>
+            <div class="inp"><span class="pre">R$</span><input type="text" inputmode="decimal" id="precoTeste" data-dec="2" placeholder="0,00"></div>
+          </div>
+          <div class="f" style="justify-content:flex-end">
+            <div id="testeOut" class="sub" style="font-size:13px; line-height:1.6"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <header><span class="idx">10</span><h2>Minhas peças salvas</h2><span class="hint" id="hintLib"></span></header>
+      <div class="body">
+        <div style="overflow-x:auto"><table class="lib" id="libTable"></table></div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ============ RESULTADO ============ -->
+  <div class="panel">
+    <section class="card">
+      <div class="hero">
+        <div class="eyebrow">Preço de venda sugerido</div>
+        <div class="price" id="precoSugerido"><small>R$</small>0,00</div>
+        <div class="price-sub" id="precoSub">por unidade</div>
+        <div class="roundbox">
+          <span class="chip">Redondo <b id="precoRedondo">—</b></span>
+          <span class="chip">Mínimo <b id="precoMinimo">—</b></span>
+          <span class="chip" id="chipFrete" hidden>Frete <b id="freteInfo">—</b></span>
+        </div>
+      </div>
+      <div class="alert" id="alerta"></div>
+      <div class="stats">
+        <div class="stat"><div class="k">Preço unitário no pedido</div><div class="v" id="precoPedido">—</div></div>
+        <div class="stat"><div class="k">Desconto aplicado</div><div class="v" id="descAplicado">—</div></div>
+        <div class="stat"><div class="k">Custo total da peça</div><div class="v" id="custoTotal">—</div></div>
+        <div class="stat"><div class="k">Lucro líquido por peça</div><div class="v good" id="lucroLiq">—</div></div>
+        <div class="stat"><div class="k">Margem líquida</div><div class="v" id="margemLiq">—</div></div>
+        <div class="stat"><div class="k">Lucro por hora de máquina</div><div class="v" id="lucroHora">—</div></div>
+        <div class="stat"><div class="k">Total do pedido</div><div class="v" id="totalPedido">—</div></div>
+        <div class="stat"><div class="k">Lucro do pedido</div><div class="v good" id="lucroPedido">—</div></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <header><h2>Onde vai o custo</h2><span class="hint" id="hintCusto"></span></header>
+      <div class="body">
+        <div class="bar" id="barCusto"></div>
+        <table class="legend" id="tabCusto"></table>
+        <div class="sub" id="detalheEntrega"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <header><h2>Onde vai o preço</h2><span class="hint">de cada R$ 100 recebidos</span></header>
+      <div class="body">
+        <div class="bar" id="barPreco"></div>
+        <table class="legend" id="tabPreco"></table>
+      </div>
+    </section>
+  </div>
+
+</div>
+</div>
+
+<div id="tip"></div>
+
+<footer class="foot">
+  <p>Os cálculos rodam no seu navegador e os dados ficam salvos neste dispositivo. Use <b>Exportar</b> para guardar uma cópia das peças salvas.</p>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- util ---------- */
+  var BRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
+  function money(v){ return BRL.format(isFinite(v)?v:0); }
+  function num(v,d){ return new Intl.NumberFormat('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}).format(isFinite(v)?v:0); }
+  function $(id){ return document.getElementById(id); }
+
+  function parseNum(s){
+    if(typeof s === 'number') return s;
+    s = String(s||'').replace(/[R$\s]/g,'');
+    if(!s) return 0;
+    if(s.indexOf(',') > -1){ s = s.replace(/\./g,'').replace(',', '.'); }
+    var n = parseFloat(s);
+    return isFinite(n) ? n : 0;
+  }
+
+  var FIELDS = ['nomePeca','horas','minutos','gramasPeca','gramasPurga','pecasPorLote','taxaFalha','quantidade',
+    'tipoFilamento','precoKg','precoMaquina','vidaUtil','manutHora','potencia','tarifa',
+    'minutosTrabalho','valorHora','custoPintura','custoExtras','custoEmbalagem',
+    'fixosMes','horasProdMes','margem','comissao','taxaPagamento','imposto',
+    'freteModo','freteValor','qtd1','desc1','qtd2','desc2','qtd3','desc3','precoTeste'];
+
+  function val(id){ return parseNum($(id).value); }
+
+  /* ---------- storage (tolerante a bloqueio) ---------- */
+  var mem = {};
+  function store(k,v){ try{ localStorage.setItem(k,v); }catch(e){ mem[k]=v; } }
+  function load(k){ try{ var v = localStorage.getItem(k); return v===null?(mem[k]||null):v; }catch(e){ return mem[k]||null; } }
+
+  /* ---------- cálculo ---------- */
+
+  // Faixas de desconto, ordenadas da maior quantidade para a menor.
+  function faixas(){
+    return [[val('qtd3'), val('desc3')], [val('qtd2'), val('desc2')], [val('qtd1'), val('desc1')]]
+      .filter(function(f){ return f[0] >= 1 && f[1] > 0; })
+      .sort(function(a,b){ return b[0]-a[0]; });
+  }
+  function descontoPara(qtd){
+    var f = faixas().find(function(x){ return qtd >= x[0]; });
+    return f ? Math.min(90, f[1])/100 : 0;
+  }
+
+  // Custo por unidade num pedido de `qtd` unidades. Só o frete embutido varia com a quantidade.
+  function custoDe(qtd){
+    var tempoH = val('horas') + val('minutos')/60;
+    var lote = Math.max(1, val('pecasPorLote'));
+    var tempoUn = tempoH / lote;                    // horas de máquina por peça
+    var precoKg = val('precoKg');
+    var falha = Math.min(0.9, Math.max(0, val('taxaFalha')/100));
+    var freteEmb = $('freteModo').value === 'embutido' ? val('freteValor')/Math.max(1,qtd) : 0;
+
+    var c = {};
+    c.filamento  = (val('gramasPeca')/1000) * precoKg / lote;
+    c.purga      = (val('gramasPurga')/1000) * precoKg / lote;
+    c.energia    = (val('potencia')/1000) * tempoH * val('tarifa') / lote;
+    var deprec   = (val('vidaUtil') > 0 ? val('precoMaquina')/val('vidaUtil') : 0) * tempoH / lote;
+    c.maquina    = deprec + val('manutHora') * tempoH / lote;
+    c.trabalho   = (val('minutosTrabalho')/60) * val('valorHora');
+    c.materiais  = val('custoPintura') + val('custoExtras') + val('custoEmbalagem') + freteEmb;
+
+    // O que se perde numa impressão falha: filamento, purga, energia e desgaste da máquina.
+    var producao = c.filamento + c.purga + c.energia + c.maquina;
+    var reserva  = falha < 1 ? producao * (1/(1-falha) - 1) : 0;
+    var rateio   = val('horasProdMes') > 0 ? (val('fixosMes')/val('horasProdMes')) * tempoUn : 0;
+    c.estrutura  = reserva + rateio;
+
+    var total = c.filamento + c.purga + c.energia + c.maquina + c.trabalho + c.materiais + c.estrutura;
+
+    return { c:c, total:total, freteEmb:freteEmb, tempoH:tempoH, tempoUn:tempoUn,
+             lote:lote, reserva:reserva, rateio:rateio, deprec:deprec,
+             gramasTotal:(val('gramasPeca')+val('gramasPurga'))/lote };
+  }
+
+  function calc(){
+    var qtd = Math.max(1, val('quantidade'));
+    var taxas = (val('comissao') + val('taxaPagamento') + val('imposto')) / 100;
+    var restante = 1 - taxas;
+    var taxasOK = restante > 0.02;
+    var margem = val('margem')/100;
+
+    // Preço de tabela: venda avulsa de 1 unidade, com o frete inteiro se ele for embutido.
+    var base = custoDe(1);
+    var precoTabela = taxasOK ? base.total * (1 + margem) / restante : 0;
+    var precoMin    = taxasOK ? base.total / restante : 0;
+
+    // Este pedido: custo por peça na quantidade pedida, com a faixa de desconto aplicada.
+    var d = custoDe(qtd);
+    var desconto = descontoPara(qtd);
+    var precoUn = precoTabela * (1 - desconto);
+    var lucro = precoUn * restante - d.total;
+    var margemLiq = precoUn > 0 ? lucro/precoUn : 0;
+    var lucroHora = d.tempoUn > 0 ? lucro/d.tempoUn : 0;
+
+    var modo = $('freteModo').value;
+    var freteCliente = modo === 'cliente' ? val('freteValor') : 0;
+
+    var r = {
+      c:d.c, custoTotal:d.total, precoTabela:precoTabela, precoSug:precoTabela, precoUn:precoUn,
+      precoMin:precoMin, desconto:desconto, lucro:lucro, margemLiq:margemLiq, lucroHora:lucroHora,
+      taxas:taxas, taxasOK:taxasOK, qtd:qtd, modo:modo, freteEmb:d.freteEmb, freteCliente:freteCliente,
+      totalPedido: precoUn*qtd + freteCliente, lucroPedido: lucro*qtd,
+      tempoH:d.tempoH, tempoUn:d.tempoUn, lote:d.lote, reserva:d.reserva, rateio:d.rateio,
+      deprec:d.deprec, gramasTotal:d.gramasTotal, restante:restante
+    };
+
+    // Escada de faixas: 1 unidade cheia + cada faixa configurada.
+    var pontos = [{q:1, d:0}];
+    faixas().slice().reverse().forEach(function(f){
+      if(f[0] > 1) pontos.push({q:Math.round(f[0]), d:Math.min(90,f[1])/100});
+    });
+    r.escada = pontos.map(function(p){
+      var cd = custoDe(p.q);
+      var pu = precoTabela * (1 - p.d);
+      var lu = pu * restante - cd.total;
+      return { qtd:p.q, desc:p.d, preco:pu, custo:cd.total, lucro:lu,
+               margem: pu > 0 ? lu/pu : 0, lucroLote: lu*p.q,
+               ativa: p.q === (pontos.filter(function(x){ return qtd >= x.q; }).pop()||{}).q };
+    });
+    return r;
+  }
+
+  /* ---------- séries do gráfico ---------- */
+  var SERIES = [
+    {k:'filamento', nome:'Filamento na peça',      cor:'var(--s1)'},
+    {k:'purga',     nome:'Purga / desperdício',    cor:'var(--s2)'},
+    {k:'energia',   nome:'Energia elétrica',       cor:'var(--s3)'},
+    {k:'maquina',   nome:'Máquina e manutenção',   cor:'var(--s4)'},
+    {k:'trabalho',  nome:'Seu trabalho',           cor:'var(--s5)'},
+    {k:'materiais', nome:'Materiais e entrega',    cor:'var(--s6)'},
+    {k:'estrutura', nome:'Custos fixos e falhas',  cor:'var(--s7)'}
+  ];
+
+  var tip = $('tip');
+  function bindTip(el, texto){
+    el.addEventListener('mousemove', function(e){
+      tip.textContent = texto;
+      tip.classList.add('on');
+      var x = Math.min(e.clientX + 12, window.innerWidth - tip.offsetWidth - 8);
+      tip.style.left = x + 'px';
+      tip.style.top = (e.clientY - 34) + 'px';
+    });
+    el.addEventListener('mouseleave', function(){ tip.classList.remove('on'); });
+  }
+
+  function desenhaBarra(el, itens, total){
+    el.innerHTML = '';
+    itens.forEach(function(it){
+      if(it.v <= 0) return;
+      var s = document.createElement('span');
+      s.style.flex = it.v + ' 0 0';
+      s.style.background = it.cor;
+      var pct = total > 0 ? (it.v/total*100) : 0;
+      bindTip(s, it.nome + ' — ' + money(it.v) + ' (' + num(pct,1) + '%)');
+      el.appendChild(s);
+    });
+    if(!el.children.length){
+      var vazio = document.createElement('span');
+      vazio.style.flex = '1 0 0';
+      vazio.style.background = 'var(--surface-3)';
+      el.appendChild(vazio);
+    }
+  }
+
+  function desenhaTabela(el, itens, total, rotuloTotal){
+    var linhas = itens.filter(function(i){ return i.v > 0; }).map(function(it){
+      var pct = total > 0 ? it.v/total*100 : 0;
+      return '<tr><td class="name"><span class="sw" style="background:'+it.cor+'"></span>'+it.nome+'</td>'+
+             '<td class="n">'+money(it.v)+'</td><td class="n">'+num(pct,1)+'%</td></tr>';
+    }).join('');
+    el.innerHTML =
+      '<thead><tr><th>Item</th><th class="n">Valor</th><th class="n">Fatia</th></tr></thead>'+
+      '<tbody>'+(linhas || '<tr><td class="empty" colspan="3">Preencha os campos ao lado.</td></tr>')+'</tbody>'+
+      '<tfoot><tr><td>'+rotuloTotal+'</td><td class="n">'+money(total)+'</td><td class="n">100%</td></tr></tfoot>';
+  }
+
+  function arredonda(v){
+    if(v <= 0) return 0;
+    if(v < 20) return Math.ceil(v);                        // até R$20: real cheio
+    if(v < 100) return Math.ceil(v/5)*5 - 0.10;            // R$24,90 / R$29,90
+    return Math.ceil(v/10)*10 - 0.10;                      // R$119,90
+  }
+
+  var r = null;
+
+  function render(){
+    r = calc();
+
+    $('precoSugerido').innerHTML = '<small>R$</small>' + num(r.precoTabela,2);
+    $('precoSub').textContent = 'preço de tabela, 1 un · ' + num(r.tempoUn,2).replace(',00','') + ' h de máquina · ' + num(r.gramasTotal,0) + ' g de filamento';
+    $('precoRedondo').textContent = money(arredonda(r.precoTabela));
+    $('precoMinimo').textContent = money(r.precoMin);
+
+    var chipF = $('chipFrete');
+    if(r.modo === 'cliente' && r.freteCliente > 0){
+      chipF.hidden = false; $('freteInfo').textContent = money(r.freteCliente) + ' (cliente)';
+    } else if(r.modo === 'embutido' && val('freteValor') > 0){
+      chipF.hidden = false; $('freteInfo').textContent = money(r.freteEmb) + '/un embutido';
+    } else { chipF.hidden = true; }
+
+    $('precoPedido').textContent = money(r.precoUn);
+    $('descAplicado').textContent = r.desconto > 0 ? '−' + num(r.desconto*100,0) + '%' : 'nenhum';
+    $('custoTotal').textContent = money(r.custoTotal);
+    var el = $('lucroLiq');
+    el.textContent = money(r.lucro);
+    el.className = 'v ' + (r.lucro >= 0 ? 'good' : 'bad');
+    $('margemLiq').textContent = num(r.margemLiq*100,1) + '%';
+    $('margemLiq').className = 'v ' + (r.margemLiq >= 0 ? '' : 'bad');
+    $('lucroHora').textContent = money(r.lucroHora);
+    $('totalPedido').textContent = money(r.totalPedido);
+    var lp = $('lucroPedido');
+    lp.textContent = money(r.lucroPedido);
+    lp.className = 'v ' + (r.lucroPedido >= 0 ? 'good' : 'bad');
+
+    // alerta
+    var a = $('alerta'), msg = '';
+    if(!r.taxasOK){
+      msg = 'As taxas somam ' + num(r.taxas*100,1) + '% do preço. Acima de 98% não existe preço que feche a conta — revise a comissão e o imposto.';
+    } else if(r.lucro < 0){
+      msg = 'Prejuízo de ' + money(-r.lucro) + ' por peça nesta configuração. Reduza o desconto, tire o frete grátis ou aumente a margem.';
+    } else if(r.margemLiq < 0.10 && r.custoTotal > 0){
+      msg = 'Margem líquida abaixo de 10%. Depois das taxas sobra pouco para cobrir imprevisto — aumente a margem ou reduza tempo/purga.';
+    } else if(r.modo === 'embutido' && r.freteEmb > r.custoTotal * 0.25){
+      msg = 'O frete embutido é ' + num(r.freteEmb/r.custoTotal*100,0) + '% do custo da peça. Frete grátis em pedido pequeno come a margem — considere pedido mínimo.';
+    } else if(r.c.purga > r.c.filamento && r.c.purga > 0){
+      msg = 'A purga está custando mais que a própria peça. Vale agrupar várias peças na mesma mesa ou reduzir trocas de cor no fatiador.';
+    } else if(r.lucroHora > 0 && r.lucroHora < 5 && r.tempoUn > 0){
+      msg = 'Lucro de ' + money(r.lucroHora) + ' por hora de máquina. Peças longas de baixo valor ocupam a impressora e travam encomendas melhores.';
+    }
+    a.textContent = msg;
+    a.classList.toggle('on', !!msg);
+
+    // escada de desconto
+    var linhas = r.escada.map(function(f){
+      var cor = f.lucro >= 0 ? (f.margem < 0.10 ? 'var(--warn)' : 'var(--good)') : 'var(--bad)';
+      return '<tr'+(f.ativa?' style="background:var(--accent-soft)"':'')+'>'+
+        '<td class="n">'+f.qtd+' un</td>'+
+        '<td class="n">'+(f.desc > 0 ? '−'+num(f.desc*100,0)+'%' : '—')+'</td>'+
+        '<td class="n"><b>'+money(f.preco)+'</b></td>'+
+        '<td class="n">'+money(f.custo)+'</td>'+
+        '<td class="n" style="color:'+cor+'">'+num(f.margem*100,1)+'%</td>'+
+        '<td class="n" style="color:'+cor+'">'+money(f.lucroLote)+'</td></tr>';
+    }).join('');
+    $('tabFaixas').innerHTML =
+      '<thead><tr><th class="n">Qtd</th><th class="n">Desc.</th><th class="n">Preço un</th>'+
+      '<th class="n">Custo un</th><th class="n">Margem</th><th class="n">Lucro do lote</th></tr></thead>'+
+      '<tbody>'+linhas+'</tbody>';
+
+    // gráfico de custo
+    var itensCusto = SERIES.map(function(s){ return {nome:s.nome, cor:s.cor, v:r.c[s.k]}; });
+    desenhaBarra($('barCusto'), itensCusto, r.custoTotal);
+    desenhaTabela($('tabCusto'), itensCusto, r.custoTotal, 'Custo total');
+    $('hintCusto').textContent = money(r.custoTotal) + ' por peça';
+
+    // gráfico de preço
+    var valTaxas = r.precoUn * r.taxas;
+    var itensPreco = [
+      {nome:'Custo de produção', cor:'var(--neutral-mark)', v:r.custoTotal},
+      {nome:'Taxas e impostos',  cor:'var(--s7)',           v:valTaxas},
+      {nome:'Seu lucro',         cor:'var(--good)',         v:Math.max(0,r.lucro)}
+    ];
+    desenhaBarra($('barPreco'), itensPreco, r.precoUn);
+    desenhaTabela($('tabPreco'), itensPreco, r.precoUn, 'Preço cobrado');
+
+    // dicas de cabeçalho
+    $('hintPeca').textContent = num(r.tempoH,2).replace(',00','') + ' h na mesa · ' + r.lote + ' peça(s)';
+    $('hintFil').textContent = money((r.c.filamento + r.c.purga)) + ' por peça';
+    $('hintMaq').textContent = money(r.c.energia) + ' de luz · ' + money(r.c.maquina) + ' de máquina';
+    $('hintTrab').textContent = money(r.c.trabalho + r.c.materiais - r.freteEmb) + ' por peça';
+    $('hintFix').textContent = money(r.rateio) + ' de rateio · ' + money(r.reserva) + ' de reserva';
+    $('hintVenda').textContent = 'taxas: ' + num(r.taxas*100,1) + '%';
+    $('hintFrete').textContent = r.modo === 'embutido'
+      ? money(r.freteEmb) + ' por peça em ' + r.qtd + ' un'
+      : (r.modo === 'cliente' && r.freteCliente > 0 ? money(r.freteCliente) + ' fora do preço' : 'sem frete');
+    $('hintDesc').textContent = r.desconto > 0 ? '−' + num(r.desconto*100,0) + '% nesta quantidade' : 'sem desconto em ' + r.qtd + ' un';
+    $('detalheEntrega').innerHTML = r.freteEmb > 0
+      ? 'Dentro de <b>Materiais e entrega</b>: ' + money(r.freteEmb) + ' de frete rateado entre ' + r.qtd + ' unidade(s).'
+      : '';
+
+    // teste de preço
+    var pt = val('precoTeste'), out = $('testeOut');
+    if(pt > 0){
+      var liqT = pt * (1 - r.taxas) - r.custoTotal;
+      var margT = liqT/pt*100;
+      var horaT = r.tempoUn > 0 ? liqT/r.tempoUn : 0;
+      var cor = liqT >= 0 ? 'var(--good)' : 'var(--bad)';
+      out.innerHTML =
+        'Sobra <b style="color:'+cor+'">'+money(liqT)+'</b> por peça<br>'+
+        'Margem líquida <b>'+num(margT,1)+'%</b> · <b>'+money(horaT)+'</b> por hora de máquina<br>'+
+        '<span style="color:var(--muted)">No pedido de '+r.qtd+' un: '+money(liqT*r.qtd)+'</span>';
+    } else {
+      out.innerHTML = '<span style="color:var(--muted)">Digite um preço para ver quanto sobra depois das taxas e do custo.</span>';
+    }
+
+    salvaEstado();
+  }
+
+  /* ---------- estado ---------- */
+  function estado(){
+    var o = {};
+    FIELDS.forEach(function(f){ o[f] = $(f).value; });
+    return o;
+  }
+  function aplica(o){
+    FIELDS.forEach(function(f){ if(o[f] !== undefined) $(f).value = o[f]; });
+    render();
+  }
+  function salvaEstado(){ store('p3d.state.v2', JSON.stringify(estado())); }
+
+  /* ---------- biblioteca ---------- */
+  function lib(){ try{ return JSON.parse(load('p3d.lib.v2')||'[]'); }catch(e){ return []; } }
+  function setLib(a){ store('p3d.lib.v2', JSON.stringify(a)); renderLib(); }
+
+  function renderLib(){
+    var a = lib(), t = $('libTable');
+    $('hintLib').textContent = a.length ? a.length + ' peça(s)' : '';
+    if(!a.length){
+      t.innerHTML = '<tbody><tr><td class="empty">Nenhuma peça salva. Preencha os dados e clique em “Salvar peça”.</td></tr></tbody>';
+      return;
+    }
+    var linhas = a.map(function(p,i){
+      return '<tr><td>'+escapa(p.nome)+'</td>'+
+        '<td class="n">'+p.tempo+'</td>'+
+        '<td class="n">'+money(p.custo)+'</td>'+
+        '<td class="n"><b>'+money(p.preco)+'</b></td>'+
+        '<td class="n" style="color:'+(p.lucro>=0?'var(--good)':'var(--bad)')+'">'+money(p.lucro)+'</td>'+
+        '<td><div class="acts"><button class="btn tiny" data-load="'+i+'" type="button">Abrir</button>'+
+        '<button class="btn tiny ghost" data-del="'+i+'" type="button">Excluir</button></div></td></tr>';
+    }).join('');
+    t.innerHTML = '<thead><tr><th>Peça</th><th class="n">Tempo</th><th class="n">Custo</th><th class="n">Preço</th><th class="n">Lucro</th><th></th></tr></thead><tbody>'+linhas+'</tbody>';
+  }
+  function escapa(s){ return String(s||'').replace(/[&<>"]/g, function(ch){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]; }); }
+
+  $('libTable').addEventListener('click', function(e){
+    var b = e.target.closest('button'); if(!b) return;
+    var a = lib();
+    if(b.dataset.load !== undefined){ aplica(a[b.dataset.load].dados); window.scrollTo({top:0,behavior:'smooth'}); }
+    if(b.dataset.del !== undefined){ a.splice(b.dataset.del,1); setLib(a); }
+  });
+
+  $('btnSave').addEventListener('click', function(){
+    var nome = $('nomePeca').value.trim();
+    if(!nome){ $('nomePeca').focus(); $('nomePeca').placeholder = 'Dê um nome à peça antes de salvar'; return; }
+    var a = lib();
+    var reg = { nome:nome, dados:estado(), preco:r.precoTabela, custo:r.custoTotal, lucro:r.lucro,
+                tempo:num(r.tempoUn,2).replace(',00','')+' h' };
+    var idx = a.findIndex(function(p){ return p.nome.toLowerCase() === nome.toLowerCase(); });
+    if(idx > -1) a[idx] = reg; else a.push(reg);
+    setLib(a);
+  });
+
+  /* ---------- ações ---------- */
+  $('btnCopy').addEventListener('click', function(){
+    var nome = $('nomePeca').value.trim() || 'Peça 3D';
+    var unit = arredonda(r.precoUn);
+    var txt = nome + '\n' +
+      'Quantidade: ' + r.qtd + ' un\n' +
+      'Preço unitário: ' + money(unit) + (r.desconto > 0 ? '  (desconto de ' + num(r.desconto*100,0) + '% já aplicado)' : '') + '\n';
+    if(r.modo === 'cliente' && r.freteCliente > 0)      txt += 'Frete: ' + money(r.freteCliente) + '\n';
+    else if(r.modo === 'embutido' && val('freteValor') > 0) txt += 'Frete: grátis\n';
+    txt += 'Total: ' + money(unit * r.qtd + r.freteCliente) + '\n' +
+      'Prazo de impressão: ' + num(r.tempoUn * r.qtd, 1) + ' h no total';
+    navigator.clipboard.writeText(txt).then(function(){
+      var b = $('btnCopy'); b.textContent = 'Copiado';
+      setTimeout(function(){ b.textContent = 'Copiar orçamento'; }, 1600);
+    });
+  });
+
+  $('btnExport').addEventListener('click', function(){
+    var blob = new Blob([JSON.stringify({estado:estado(), lib:lib()}, null, 2)], {type:'application/json'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'precifica-3d.json'; a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  });
+
+  $('btnImport').addEventListener('click', function(){ $('fileIn').click(); });
+  $('fileIn').addEventListener('change', function(e){
+    var f = e.target.files[0]; if(!f) return;
+    var fr = new FileReader();
+    fr.onload = function(){
+      try{
+        var o = JSON.parse(fr.result);
+        if(o.lib) setLib(o.lib);
+        if(o.estado) aplica(o.estado);
+      }catch(err){
+        $('btnImport').textContent = 'Arquivo inválido';
+        setTimeout(function(){ $('btnImport').textContent = 'Importar'; }, 2000);
+      }
+    };
+    fr.readAsText(f);
+    e.target.value = '';
+  });
+
+  $('btnTheme').addEventListener('click', function(){
+    var atual = document.documentElement.getAttribute('data-theme');
+    var escuro = atual ? atual === 'dark'
+      : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.setAttribute('data-theme', escuro ? 'light' : 'dark');
+    store('p3d.tema', escuro ? 'light' : 'dark');
+  });
+
+  $('tipoFilamento').addEventListener('change', function(){
+    var v = parseFloat(this.value);
+    if(v > 0){ $('precoKg').value = num(v,2); }
+    render();
+  });
+
+  /* ---------- ligação dos campos ---------- */
+  FIELDS.forEach(function(f){
+    var el = $(f);
+    el.addEventListener('input', render);
+    if(el.dataset.dec !== undefined){
+      el.addEventListener('blur', function(){
+        if(el.value.trim() === '') return;
+        el.value = num(parseNum(el.value), parseInt(el.dataset.dec,10));
+        render();
+      });
+      el.addEventListener('focus', function(){ el.select(); });
+    }
+  });
+
+  /* ---------- início ---------- */
+  var tema = load('p3d.tema');
+  if(tema) document.documentElement.setAttribute('data-theme', tema);
+  var salvo = load('p3d.state.v2');
+  if(salvo){ try{ aplica(JSON.parse(salvo)); }catch(e){} }
+  renderLib();
+  render();
+})();
+</script>
