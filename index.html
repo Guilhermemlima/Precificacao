@@ -141,6 +141,19 @@ select:focus{outline:none; border-color:var(--accent)}
   padding:9px 12px; border-radius:0 7px 7px 0; line-height:1.45;
 }
 .note b{color:var(--ink)}
+textarea{
+  width:100%; background:var(--surface-2); color:var(--ink); border:1px solid var(--line-strong);
+  border-radius:8px; padding:9px 10px; font-family:var(--font-ui); font-size:14px; line-height:1.45;
+  resize:vertical; min-height:56px;
+}
+textarea:focus{outline:none; border-color:var(--accent); background:var(--surface)}
+.upload{
+  border:1px dashed var(--line-strong); border-radius:9px; background:var(--surface-2);
+  padding:11px; display:flex; flex-direction:column; align-items:center; gap:9px; text-align:center;
+}
+.upload img{max-width:100%; max-height:104px; border-radius:5px; object-fit:contain}
+.upload .ph{font-size:11.5px; color:var(--muted); line-height:1.35}
+.upload-acts{display:flex; gap:6px}
 
 /* ---------- results ---------- */
 .panel{position:sticky; top:16px; display:flex; flex-direction:column; gap:14px}
@@ -202,6 +215,63 @@ select:focus{outline:none; border-color:var(--accent)}
 
 footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--muted); font-size:12.5px; line-height:1.6}
 @media (prefers-reduced-motion: reduce){ *{transition:none !important} }
+
+/* ---------- folha de orçamento (só na impressão / PDF) ---------- */
+#orcamento{display:none}
+.sheet{
+  color-scheme:light;
+  width:210mm; min-height:297mm; padding:15mm 15mm 12mm; margin:0 auto;
+  background:#ffffff; color:#14181d; font-family:var(--font-ui); font-size:10.5pt; line-height:1.45;
+  display:flex; flex-direction:column;
+}
+.sheet *{box-sizing:border-box}
+.sh-top{display:flex; align-items:flex-start; justify-content:space-between; gap:14mm}
+.sh-logo{max-height:24mm; max-width:62mm; object-fit:contain}
+.sh-marca{font-family:var(--font-display); font-size:17pt; font-weight:600; letter-spacing:.02em; line-height:1.1}
+.sh-meta{text-align:right; flex:none}
+.sh-meta .t{font-family:var(--font-display); font-size:19pt; font-weight:600; letter-spacing:.16em; color:#c8480a; line-height:1}
+.sh-meta .d{font-family:var(--font-mono); font-size:9.5pt; color:#6b7481; margin-top:3mm; line-height:1.6}
+.sh-rule{height:2.5pt; background:#c8480a; margin:5mm 0 0; border-radius:1pt}
+.sh-parties{display:grid; grid-template-columns:1fr 1fr; gap:10mm; margin-top:6mm}
+.sh-h{font-family:var(--font-display); font-size:8pt; letter-spacing:.16em; text-transform:uppercase; color:#6b7481; margin-bottom:1.5mm}
+.sh-parties .nome{font-size:12pt; font-weight:600; line-height:1.25}
+.sh-parties .info{font-size:9.5pt; color:#4a5560; line-height:1.5; margin-top:1mm}
+.sh-item{display:flex; gap:8mm; margin-top:7mm; align-items:flex-start}
+.sh-foto{width:52mm; flex:none; border:1pt solid #d6dbe1; border-radius:2mm; padding:2mm; background:#fbfbfc}
+.sh-foto img{width:100%; max-height:52mm; object-fit:contain; display:block}
+.sh-desc{flex:1; min-width:0}
+.sh-desc .nome{font-size:14pt; font-weight:600; line-height:1.2}
+.sh-desc .txt{font-size:10pt; color:#4a5560; margin-top:2mm; line-height:1.5; white-space:pre-wrap}
+.sh-tab{width:100%; border-collapse:collapse; margin-top:7mm; font-size:10pt}
+.sh-tab th{
+  font-family:var(--font-display); font-size:8pt; letter-spacing:.14em; text-transform:uppercase;
+  color:#6b7481; text-align:left; padding:0 0 2mm; border-bottom:1pt solid #14181d; font-weight:600;
+}
+.sh-tab td{padding:3mm 0; border-bottom:.75pt solid #e4e8ec; vertical-align:top}
+.sh-tab .n{text-align:right; font-family:var(--font-mono); font-variant-numeric:tabular-nums; white-space:nowrap}
+.sh-tot{margin-top:5mm; margin-left:auto; width:82mm; font-size:10pt}
+.sh-tot .l{display:flex; justify-content:space-between; gap:6mm; padding:1.6mm 0; color:#4a5560}
+.sh-tot .l .n{font-family:var(--font-mono); font-variant-numeric:tabular-nums}
+.sh-tot .l.desc{color:#0f7a34}
+.sh-tot .l.total{
+  margin-top:2mm; padding:3mm 4mm; background:#fdece2; border-left:2.5pt solid #c8480a; border-radius:0 1.5mm 1.5mm 0;
+  color:#14181d; font-size:13pt; font-weight:700; align-items:baseline;
+}
+.sh-cond{margin-top:auto; padding-top:8mm; display:grid; grid-template-columns:repeat(3,1fr); gap:6mm}
+.sh-cond .v{font-size:10.5pt; font-weight:600; margin-top:.5mm}
+.sh-obs{margin-top:6mm; font-size:9pt; color:#4a5560; line-height:1.5; white-space:pre-wrap}
+.sh-foot{
+  margin-top:6mm; padding-top:3mm; border-top:.75pt solid #e4e8ec;
+  display:flex; justify-content:space-between; gap:6mm; font-size:8.5pt; color:#6b7481;
+}
+@page{ size:A4; margin:0 }
+@media print{
+  html,body{background:#fff !important}
+  header.top, .wrap, footer.foot, #tip{display:none !important}
+  #orcamento{display:block !important}
+  .sheet{width:auto; min-height:auto; box-shadow:none; page-break-after:avoid}
+  *{-webkit-print-color-adjust:exact !important; print-color-adjust:exact !important}
+}
 </style>
 
 <header class="top">
@@ -485,7 +555,104 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
     </section>
 
     <section class="card">
-      <header><span class="idx">09</span><h2>Testar um preço</h2><span class="hint">Quanto sobra se eu cobrar…</span></header>
+      <header><span class="idx">09</span><h2>Orçamento para o cliente</h2><span class="hint" id="hintOrc"></span></header>
+      <div class="body">
+
+        <div class="mini-label">Sua marca</div>
+        <div class="row">
+          <div class="f">
+            <label for="orcMarca">Nome do negócio</label>
+            <div class="inp"><input class="txt" type="text" id="orcMarca" placeholder="Ateliê 3D do Guilherme"></div>
+          </div>
+          <div class="f">
+            <label for="orcFone">WhatsApp</label>
+            <div class="inp"><input class="txt" type="text" id="orcFone" placeholder="(00) 00000-0000"></div>
+          </div>
+          <div class="f">
+            <label for="orcContato">E-mail ou Instagram</label>
+            <div class="inp"><input class="txt" type="text" id="orcContato" placeholder="@seuperfil"></div>
+          </div>
+          <div class="f">
+            <label for="orcDoc">CPF ou CNPJ <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
+            <div class="inp"><input class="txt" type="text" id="orcDoc" placeholder=""></div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="f">
+            <label>Logo</label>
+            <div class="upload" id="boxLogo">
+              <img id="prevLogo" alt="Logo carregada" hidden>
+              <span class="ph" id="phLogo">PNG com fundo transparente fica melhor</span>
+              <div class="upload-acts">
+                <button class="btn tiny" type="button" id="btnLogo">Escolher</button>
+                <button class="btn tiny ghost" type="button" id="btnLogoX" hidden>Remover</button>
+              </div>
+            </div>
+            <input type="file" id="fileLogo" accept="image/*" hidden>
+          </div>
+          <div class="f">
+            <label>Foto do produto</label>
+            <div class="upload" id="boxFoto">
+              <img id="prevFoto" alt="Foto do produto" hidden>
+              <span class="ph" id="phFoto">Foto da peça pronta ou a referência que o cliente mandou</span>
+              <div class="upload-acts">
+                <button class="btn tiny" type="button" id="btnFoto">Escolher</button>
+                <button class="btn tiny ghost" type="button" id="btnFotoX" hidden>Remover</button>
+              </div>
+            </div>
+            <input type="file" id="fileFoto" accept="image/*" hidden>
+          </div>
+        </div>
+
+        <div class="mini-label">Este orçamento</div>
+        <div class="row">
+          <div class="f">
+            <label for="orcCliente">Nome do cliente</label>
+            <div class="inp"><input class="txt" type="text" id="orcCliente" placeholder="A quem se destina"></div>
+          </div>
+          <div class="f">
+            <label for="orcClienteContato">Contato do cliente</label>
+            <div class="inp"><input class="txt" type="text" id="orcClienteContato" placeholder="Telefone, e-mail ou @"></div>
+          </div>
+          <div class="f">
+            <label for="orcNumero">Número</label>
+            <div class="inp"><span class="pre">Nº</span><input type="text" inputmode="numeric" id="orcNumero" value="1"></div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="f">
+            <label for="orcPrazo">Prazo de entrega</label>
+            <div class="inp"><input type="text" inputmode="decimal" id="orcPrazo" data-dec="0" value="7"><span class="suf">dias</span></div>
+            <span class="sub" id="subPrazo"></span>
+          </div>
+          <div class="f">
+            <label for="orcValidade">Validade da proposta</label>
+            <div class="inp"><input type="text" inputmode="decimal" id="orcValidade" data-dec="0" value="7"><span class="suf">dias</span></div>
+            <span class="sub">Protege você de alta no filamento.</span>
+          </div>
+          <div class="f">
+            <label for="orcPagamento">Forma de pagamento</label>
+            <div class="inp"><input class="txt" type="text" id="orcPagamento" value="50% na aprovação, 50% na entrega"></div>
+          </div>
+        </div>
+        <div class="f">
+          <label for="orcDescricao">Descrição do item</label>
+          <textarea id="orcDescricao" rows="2" placeholder="Ex.: Personagem em PLA, 12 cm, impresso colorido, acabamento fosco, base inclusa"></textarea>
+          <span class="sub">Aparece embaixo do nome da peça no orçamento.</span>
+        </div>
+        <div class="f">
+          <label for="orcObs">Observações</label>
+          <textarea id="orcObs" rows="2" placeholder="Ex.: Peça decorativa, não recomendada para crianças menores de 3 anos. Pequenas variações de cor e linhas de camada são características do processo."></textarea>
+        </div>
+
+        <button class="btn primary" type="button" id="btnPDF" style="align-self:flex-start">Gerar orçamento em PDF</button>
+        <p class="note">Abre a janela de impressão do navegador — escolha <b>“Salvar como PDF”</b> no destino. Deixe os gráficos de fundo ligados para a logo e as cores saírem.</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <header><span class="idx">10</span><h2>Testar um preço</h2><span class="hint">Quanto sobra se eu cobrar…</span></header>
       <div class="body">
         <div class="row">
           <div class="f">
@@ -500,7 +667,7 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
     </section>
 
     <section class="card">
-      <header><span class="idx">10</span><h2>Minhas peças salvas</h2><span class="hint" id="hintLib"></span></header>
+      <header><span class="idx">11</span><h2>Minhas peças salvas</h2><span class="hint" id="hintLib"></span></header>
       <div class="body">
         <div style="overflow-x:auto"><table class="lib" id="libTable"></table></div>
       </div>
@@ -557,6 +724,60 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
 
 <div id="tip"></div>
 
+<div id="orcamento"><div class="sheet">
+  <div class="sh-top">
+    <div>
+      <img class="sh-logo" id="shLogo" alt="" hidden>
+      <div class="sh-marca" id="shMarca"></div>
+    </div>
+    <div class="sh-meta">
+      <div class="t">ORÇAMENTO</div>
+      <div class="d" id="shMeta"></div>
+    </div>
+  </div>
+  <div class="sh-rule"></div>
+
+  <div class="sh-parties">
+    <div>
+      <div class="sh-h">Para</div>
+      <div class="nome" id="shCliente"></div>
+      <div class="info" id="shClienteInfo"></div>
+    </div>
+    <div>
+      <div class="sh-h">De</div>
+      <div class="nome" id="shDe"></div>
+      <div class="info" id="shDeInfo"></div>
+    </div>
+  </div>
+
+  <div class="sh-item">
+    <div class="sh-foto" id="shFotoBox" hidden><img id="shFoto" alt=""></div>
+    <div class="sh-desc">
+      <div class="sh-h">Item</div>
+      <div class="nome" id="shPeca"></div>
+      <div class="txt" id="shDescricao"></div>
+    </div>
+  </div>
+
+  <table class="sh-tab">
+    <thead><tr><th>Descrição</th><th class="n">Qtd</th><th class="n">Valor unitário</th><th class="n">Total</th></tr></thead>
+    <tbody id="shLinhas"></tbody>
+  </table>
+
+  <div class="sh-tot" id="shTotais"></div>
+
+  <div class="sh-cond">
+    <div><div class="sh-h">Prazo de entrega</div><div class="v" id="shPrazo"></div></div>
+    <div><div class="sh-h">Pagamento</div><div class="v" id="shPagamento"></div></div>
+    <div><div class="sh-h">Validade</div><div class="v" id="shValidade"></div></div>
+  </div>
+  <div class="sh-obs" id="shObs"></div>
+  <div class="sh-foot">
+    <span id="shFoot1"></span>
+    <span id="shFoot2"></span>
+  </div>
+</div></div>
+
 <footer class="foot">
   <p>Os cálculos rodam no seu navegador e os dados ficam salvos neste dispositivo. Use <b>Exportar</b> para guardar uma cópia das peças salvas.</p>
 </footer>
@@ -584,7 +805,9 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
     'tipoFilamento','precoKg','precoMaquina','vidaUtil','manutHora','potencia','tarifa',
     'minutosTrabalho','valorHora','custoPintura','custoExtras','custoEmbalagem',
     'fixosMes','horasProdMes','margem','comissao','taxaPagamento','imposto',
-    'freteModo','freteValor','qtd1','desc1','qtd2','desc2','qtd3','desc3','precoTeste'];
+    'freteModo','freteValor','qtd1','desc1','qtd2','desc2','qtd3','desc3','precoTeste',
+    'orcMarca','orcFone','orcContato','orcDoc','orcCliente','orcClienteContato','orcNumero',
+    'orcPrazo','orcValidade','orcPagamento','orcDescricao','orcObs'];
 
   function val(id){ return parseNum($(id).value); }
 
@@ -838,6 +1061,8 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
       ? money(r.freteEmb) + ' por peça em ' + r.qtd + ' un'
       : (r.modo === 'cliente' && r.freteCliente > 0 ? money(r.freteCliente) + ' fora do preço' : 'sem frete');
     $('hintDesc').textContent = r.desconto > 0 ? '−' + num(r.desconto*100,0) + '% nesta quantidade' : 'sem desconto em ' + r.qtd + ' un';
+    $('hintOrc').textContent = money(totaisComerciais().total) + ' · ' + r.qtd + ' un';
+    $('subPrazo').textContent = 'A impressão em si leva ' + num(r.tempoUn * r.qtd, 1) + ' h. Some seu tempo de acabamento e uma folga.';
     $('detalheEntrega').innerHTML = r.freteEmb > 0
       ? 'Dentro de <b>Materiais e entrega</b>: ' + money(r.freteEmb) + ' de frete rateado entre ' + r.qtd + ' unidade(s).'
       : '';
@@ -914,17 +1139,175 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
     setLib(a);
   });
 
+  /* ---------- imagens (logo e foto do produto) ---------- */
+  var imgs = { logo:load('p3d.logo') || '', foto:load('p3d.foto') || '' };
+
+  // Reduz a imagem antes de guardar: foto de celular estoura o espaço do navegador.
+  function processaImagem(file, maxDim, preservaAlpha, cb){
+    var fr = new FileReader();
+    fr.onerror = function(){ cb(null); };
+    fr.onload = function(){
+      var img = new Image();
+      img.onerror = function(){ cb(null); };
+      img.onload = function(){
+        var esc = Math.min(1, maxDim / Math.max(img.width, img.height));
+        var cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.round(img.width * esc));
+        cv.height = Math.max(1, Math.round(img.height * esc));
+        var ctx = cv.getContext('2d');
+        // A logo sai PNG para manter o fundo transparente; a foto sai JPEG, que ocupa
+        // uma fração do espaço — PNG de foto de celular estoura a cota do navegador.
+        var png = preservaAlpha && /image\/png|image\/webp|image\/svg/i.test(file.type);
+        if(!png){ ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,cv.width,cv.height); }
+        ctx.drawImage(img, 0, 0, cv.width, cv.height);
+        try{ cb(png ? cv.toDataURL('image/png') : cv.toDataURL('image/jpeg', 0.82)); }
+        catch(e){ cb(null); }
+      };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  }
+
+  function aplicaImagens(){
+    [['logo','prevLogo','phLogo','btnLogoX','shLogo'],
+     ['foto','prevFoto','phFoto','btnFotoX','shFoto']].forEach(function(x){
+      var dado = imgs[x[0]], prev = $(x[1]), ph = $(x[2]), rm = $(x[3]), sh = $(x[4]);
+      prev.hidden = !dado; ph.hidden = !!dado; rm.hidden = !dado;
+      if(dado){ prev.src = dado; sh.src = dado; }
+      else { prev.removeAttribute('src'); sh.removeAttribute('src'); }
+    });
+    $('shFotoBox').hidden = !imgs.foto;
+    $('shLogo').hidden = !imgs.logo;
+  }
+
+  function guardaImagem(chave, dado, btn, rotulo){
+    imgs[chave] = dado || '';
+    aplicaImagens();
+    var ok = true;
+    try{
+      if(dado) localStorage.setItem('p3d.' + chave, dado);
+      else localStorage.removeItem('p3d.' + chave);
+    }catch(e){ ok = false; mem['p3d.' + chave] = dado; }
+    if(!ok){
+      btn.textContent = 'Só nesta sessão';
+      setTimeout(function(){ btn.textContent = rotulo; }, 2600);
+    }
+  }
+
+  [['Logo','logo',700,true],['Foto','foto',1100,false]].forEach(function(x){
+    var nome = x[0], chave = x[1], dim = x[2], alpha = x[3];
+    $('btn'+nome).addEventListener('click', function(){ $('file'+nome).click(); });
+    $('btn'+nome+'X').addEventListener('click', function(){ guardaImagem(chave, '', $('btn'+nome), 'Escolher'); });
+    $('file'+nome).addEventListener('change', function(e){
+      var f = e.target.files[0]; e.target.value = '';
+      if(!f) return;
+      var btn = $('btn'+nome);
+      btn.textContent = 'Carregando…';
+      processaImagem(f, dim, alpha, function(dado){
+        btn.textContent = 'Trocar';
+        if(!dado){ btn.textContent = 'Imagem inválida'; setTimeout(function(){ btn.textContent = 'Escolher'; }, 2400); return; }
+        guardaImagem(chave, dado, btn, 'Trocar');
+      });
+    });
+  });
+
+  /* ---------- orçamento em PDF ---------- */
+  function texto(id){ return $(id).value.trim(); }
+
+  // Números que o cliente vê. Arredonda só o preço de tabela e deriva o resto dele,
+  // senão o desconto exibido não bate com o percentual anunciado.
+  function totaisComerciais(){
+    var linha = arredonda(r.precoTabela);
+    var subtotal = linha * r.qtd;
+    var abatimento = subtotal * r.desconto;
+    var frete = r.freteCliente;
+    return { linha:linha, subtotal:subtotal, abatimento:abatimento, frete:frete,
+             unit:linha * (1 - r.desconto), total:subtotal - abatimento + frete };
+  }
+  function juntaLinhas(){
+    return Array.prototype.slice.call(arguments).filter(Boolean).join('<br>');
+  }
+
+  function montaOrcamento(){
+    var qtd = r.qtd;
+    var t = totaisComerciais();
+    var hoje = new Date();
+    var validade = new Date(hoje.getTime() + Math.max(0, val('orcValidade')) * 86400000);
+    var dataBR = function(d){ return d.toLocaleDateString('pt-BR'); };
+    var numero = (texto('orcNumero') || '1').replace(/\D/g,'') || '1';
+
+    var marca = texto('orcMarca');
+    $('shMarca').textContent = marca;
+    $('shMarca').style.display = marca ? '' : 'none';
+    $('shMeta').innerHTML = juntaLinhas('Nº ' + numero.padStart(4,'0'), dataBR(hoje));
+
+    $('shCliente').textContent = texto('orcCliente') || 'Cliente';
+    $('shClienteInfo').innerHTML = juntaLinhas(texto('orcClienteContato'));
+    $('shDe').textContent = marca || 'Impressão 3D';
+    $('shDeInfo').innerHTML = juntaLinhas(texto('orcFone'), texto('orcContato'), texto('orcDoc'));
+
+    $('shPeca').textContent = texto('nomePeca') || 'Peça impressa em 3D';
+    $('shDescricao').textContent = texto('orcDescricao');
+
+    // A linha mostra sempre o preço cheio; o abatimento aparece nos totais.
+    $('shLinhas').innerHTML =
+      '<tr><td>' + escapa(texto('nomePeca') || 'Peça impressa em 3D') + '</td>' +
+      '<td class="n">' + qtd + '</td>' +
+      '<td class="n">' + money(t.linha) + '</td>' +
+      '<td class="n">' + money(t.subtotal) + '</td></tr>';
+
+    var linhas = '<div class="l"><span>Subtotal</span><span class="n">' + money(t.subtotal) + '</span></div>';
+    if(t.abatimento > 0){
+      linhas += '<div class="l desc"><span>Desconto por quantidade (' + num(r.desconto*100,0) + '%)</span>' +
+                '<span class="n">− ' + money(t.abatimento) + '</span></div>';
+    }
+    if(r.modo === 'cliente' && r.freteCliente > 0){
+      linhas += '<div class="l"><span>Frete</span><span class="n">' + money(r.freteCliente) + '</span></div>';
+    } else if(r.modo === 'embutido' && val('freteValor') > 0){
+      linhas += '<div class="l"><span>Frete</span><span class="n">grátis</span></div>';
+    } else if(r.modo === 'retirada'){
+      linhas += '<div class="l"><span>Entrega</span><span class="n">retirada em mãos</span></div>';
+    }
+    linhas += '<div class="l total"><span>Total</span><span class="n">' + money(t.total) + '</span></div>';
+    $('shTotais').innerHTML = linhas;
+
+    var dias = Math.max(0, val('orcPrazo'));
+    $('shPrazo').textContent = dias === 1 ? '1 dia útil' : num(dias,0) + ' dias úteis';
+    $('shPagamento').textContent = texto('orcPagamento') || 'A combinar';
+    $('shValidade').textContent = 'Até ' + dataBR(validade);
+    $('shObs').textContent = texto('orcObs');
+    $('shFoot1').textContent = marca ? marca + ' · orçamento nº ' + numero.padStart(4,'0') : 'Orçamento nº ' + numero.padStart(4,'0');
+    $('shFoot2').textContent = [texto('orcFone'), texto('orcContato')].filter(Boolean).join('  ·  ');
+    return numero;
+  }
+
+  $('btnPDF').addEventListener('click', function(){
+    var numero = montaOrcamento();
+    var titulo = document.title;
+    var cliente = texto('orcCliente').replace(/[^\wÀ-ÿ ]/g,'').trim();
+    // O navegador usa o título da página como nome sugerido do arquivo PDF.
+    document.title = 'Orcamento-' + numero.padStart(4,'0') + (cliente ? '-' + cliente.replace(/\s+/g,'-') : '');
+    window.print();
+    setTimeout(function(){
+      document.title = titulo;
+      $('orcNumero').value = String(parseInt(numero,10) + 1);
+      salvaEstado();
+    }, 700);
+  });
+
   /* ---------- ações ---------- */
   $('btnCopy').addEventListener('click', function(){
     var nome = $('nomePeca').value.trim() || 'Peça 3D';
-    var unit = arredonda(r.precoUn);
+    var t = totaisComerciais();
     var txt = nome + '\n' +
       'Quantidade: ' + r.qtd + ' un\n' +
-      'Preço unitário: ' + money(unit) + (r.desconto > 0 ? '  (desconto de ' + num(r.desconto*100,0) + '% já aplicado)' : '') + '\n';
-    if(r.modo === 'cliente' && r.freteCliente > 0)      txt += 'Frete: ' + money(r.freteCliente) + '\n';
+      'Preço unitário: ' + money(t.linha) + '\n';
+    if(t.abatimento > 0) txt += 'Desconto (' + num(r.desconto*100,0) + '%): − ' + money(t.abatimento) + '\n';
+    if(r.modo === 'cliente' && t.frete > 0)                 txt += 'Frete: ' + money(t.frete) + '\n';
     else if(r.modo === 'embutido' && val('freteValor') > 0) txt += 'Frete: grátis\n';
-    txt += 'Total: ' + money(unit * r.qtd + r.freteCliente) + '\n' +
-      'Prazo de impressão: ' + num(r.tempoUn * r.qtd, 1) + ' h no total';
+    else if(r.modo === 'retirada')                          txt += 'Entrega: retirada em mãos\n';
+    txt += 'Total: ' + money(t.total) + '\n' +
+      'Prazo de entrega: ' + num(val('orcPrazo'),0) + ' dias úteis';
     navigator.clipboard.writeText(txt).then(function(){
       var b = $('btnCopy'); b.textContent = 'Copiado';
       setTimeout(function(){ b.textContent = 'Copiar orçamento'; }, 1600);
@@ -932,7 +1315,7 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
   });
 
   $('btnExport').addEventListener('click', function(){
-    var blob = new Blob([JSON.stringify({estado:estado(), lib:lib()}, null, 2)], {type:'application/json'});
+    var blob = new Blob([JSON.stringify({estado:estado(), lib:lib(), imgs:imgs}, null, 2)], {type:'application/json'});
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url; a.download = 'precifica-3d.json'; a.click();
@@ -947,6 +1330,10 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
       try{
         var o = JSON.parse(fr.result);
         if(o.lib) setLib(o.lib);
+        if(o.imgs){
+          if(o.imgs.logo !== undefined) guardaImagem('logo', o.imgs.logo, $('btnLogo'), 'Trocar');
+          if(o.imgs.foto !== undefined) guardaImagem('foto', o.imgs.foto, $('btnFoto'), 'Trocar');
+        }
         if(o.estado) aplica(o.estado);
       }catch(err){
         $('btnImport').textContent = 'Arquivo inválido';
@@ -990,6 +1377,7 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
   if(tema) document.documentElement.setAttribute('data-theme', tema);
   var salvo = load('p3d.state.v2');
   if(salvo){ try{ aplica(JSON.parse(salvo)); }catch(e){} }
+  aplicaImagens();
   renderLib();
   render();
 })();

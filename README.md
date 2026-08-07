@@ -42,6 +42,15 @@ Outras regras do modelo:
 - Teste reverso: "se eu cobrar R$ X, quanto sobra?"
 - Alertas automáticos: prejuízo, margem abaixo de 10%, purga maior que a peça, frete grátis comendo a margem
 - Biblioteca de peças salvas, exportação/importação em JSON e orçamento pronto para copiar
+- **Orçamento em PDF** em folha A4, com logo e foto do produto, para enviar ao cliente
+
+## O orçamento em PDF
+
+Não usa biblioteca de PDF: a página monta uma folha A4 real e chama a impressão do navegador, onde o destino "Salvar como PDF" gera o arquivo. O texto sai vetorial e selecionável, e o nome do arquivo já vem sugerido como `Orcamento-0001-Nome-do-Cliente.pdf`.
+
+Logo e foto do produto são redimensionadas no navegador antes de guardar (logo em PNG até 700 px para manter transparência, foto em JPEG até 1100 px) e ficam embutidas como data URI no `localStorage`, junto do resto dos dados.
+
+A folha mostra o preço cheio na linha do item e o desconto por quantidade abatido nos totais — o percentual anunciado bate exatamente com o valor abatido, porque só o preço de tabela é arredondado e todo o resto deriva dele.
 
 Os dados ficam no `localStorage` do navegador. Nada é enviado para lugar nenhum.
 
