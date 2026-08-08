@@ -1,6 +1,9 @@
 # exportações da própria calculadora
 precifica-3d.json
 
+# configuração local do Claude Code (caminhos absolutos da máquina)
+.claude/
+
 # Windows
 Thumbs.db
 desktop.ini

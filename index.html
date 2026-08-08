@@ -1,4 +1,15 @@
 <title>Calculadora de Precificação 3D</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Precificação, pedidos, catálogo e estoque para impressão 3D.">
+<meta name="theme-color" content="#fbfbfc" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171b21" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Precifica 3D">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/icon192.png">
 <style>
 /* ---------- tokens ---------- */
 :root{
@@ -84,11 +95,25 @@ header.top::after{
 .tabs{
   position:relative; z-index:1; max-width:1320px; margin:0 auto; padding:0 20px;
   display:flex; align-items:center; gap:4px;
+  overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch;
 }
+.tabs::-webkit-scrollbar{display:none}
 .tab{
   background:transparent; border:0; border-bottom:2px solid transparent; color:var(--muted);
   font-family:var(--font-display); font-size:14px; letter-spacing:.07em; text-transform:uppercase;
   font-weight:600; padding:9px 12px 8px; margin-bottom:-1px; transition:color .14s, border-color .14s;
+  flex:none; white-space:nowrap;
+}
+@media (max-width:760px){
+  .tab{font-size:12.5px; letter-spacing:.03em; padding:9px 8px 8px}
+  .tab-badge{display:none}
+  .tabs, .top-inner{padding-left:14px; padding-right:14px}
+  .wrap{padding-left:14px; padding-right:14px}
+  /* Sinaliza que a barra de abas desliza para o lado. */
+  header.top::before{
+    content:""; position:absolute; right:0; bottom:1px; width:30px; height:38px; z-index:2;
+    background:linear-gradient(to right, transparent, var(--surface) 72%); pointer-events:none;
+  }
 }
 .tab:hover{color:var(--ink-2)}
 .tab.on{color:var(--accent); border-bottom-color:var(--accent)}
@@ -496,6 +521,7 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
       <button class="btn" id="btnExport" type="button">Exportar</button>
       <button class="btn" id="btnImport" type="button">Importar</button>
       <button class="btn primary" id="btnSave" type="button">Salvar peça</button>
+      <button class="btn primary" id="btnInstalar" type="button" hidden>Instalar app</button>
       <input type="file" id="fileIn" accept="application/json" hidden>
     </div>
   </div>
@@ -3231,6 +3257,49 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
       });
       el.addEventListener('focus', function(){ el.select(); });
     }
+  });
+
+  /* ---------- app instalável ----------
+     Só funciona servido por http(s): abrindo o arquivo direto (file://) o
+     navegador não permite service worker, e aí é uma página comum. */
+  if('serviceWorker' in navigator && location.protocol.indexOf('http') === 0){
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('sw.js').catch(function(){});
+    });
+  }
+
+  var promptInstalar = null;
+  var iOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  var jaInstalado = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    promptInstalar = e;
+    if(!jaInstalado) $('btnInstalar').hidden = false;
+  });
+  window.addEventListener('appinstalled', function(){
+    promptInstalar = null;
+    $('btnInstalar').hidden = true;
+  });
+
+  // O Safari do iPhone não oferece o prompt: lá a instalação é manual.
+  if(iOS && !jaInstalado){
+    $('btnInstalar').hidden = false;
+    $('btnInstalar').textContent = 'Instalar no iPhone';
+  }
+
+  $('btnInstalar').addEventListener('click', function(){
+    var b = this;
+    if(promptInstalar){
+      promptInstalar.prompt();
+      promptInstalar.userChoice.then(function(r){
+        if(r.outcome === 'accepted') b.hidden = true;
+        promptInstalar = null;
+      });
+      return;
+    }
+    b.textContent = 'Compartilhar → Adicionar à Tela de Início';
+    setTimeout(function(){ b.textContent = iOS ? 'Instalar no iPhone' : 'Instalar app'; }, 5000);
   });
 
   /* ---------- início ---------- */

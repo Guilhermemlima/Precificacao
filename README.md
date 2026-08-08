@@ -1,6 +1,17 @@
 # Precifica 3D
 
-Calculadora de precificação para impressão 3D sob encomenda. Página única em HTML, sem dependências, sem build e sem servidor: baixe `index.html` e abra no navegador, ou publique a pasta em qualquer hospedagem estática (Vercel, Netlify, GitHub Pages) sem nenhuma configuração.
+Calculadora de precificação para impressão 3D sob encomenda. Página única em HTML, sem dependências e sem build: baixe `index.html` e abra no navegador, ou publique a pasta em qualquer hospedagem estática (Vercel, Netlify, GitHub Pages) sem nenhuma configuração.
+
+## App instalável (PWA)
+
+Servido por HTTPS, instala na tela inicial e abre em tela cheia, sem barra de navegador:
+
+- **Android/Chrome** — o botão "Instalar app" aparece no cabeçalho quando o navegador oferece a instalação; também funciona pelo menu ⋮ → *Adicionar à tela inicial*.
+- **iPhone/Safari** — Safari não oferece prompt: use *Compartilhar* → *Adicionar à Tela de Início*.
+
+O service worker (`sw.js`) usa **rede primeiro** para o HTML, com o cache como reserva — assim uma versão publicada chega na próxima abertura com internet, e o app continua abrindo offline com a última que funcionou. Ícones e manifesto vêm do cache. Como os dados vivem em `localStorage` e IndexedDB, tudo funciona sem sinal depois da primeira abertura.
+
+Abrindo o arquivo direto (`file://`) o navegador não permite service worker: nesse caso é uma página comum, sem instalação.
 
 Feita para quem imprime peças coloridas em impressora com sistema multicor (AMS/ACE), onde a purga de troca de cor costuma pesar tanto quanto a própria peça.
 
