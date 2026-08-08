@@ -63,6 +63,24 @@ Indicadores do mês:
 
 Mais: gráfico de receita dos últimos 6 meses, composição da receita do mês, pipeline em aberto, e a divisão do lucro entre reserva para refazer peça, reinvestimento e o que sobra para você — tudo em percentuais que você define.
 
+## Estoque e cores
+
+Cadastro de rolos: cor, nome, tipo, marca, gramas restantes e preço do quilo. Resumo com total em kg, valor parado em estoque, quantos rolos estão abaixo do mínimo e quantas cores diferentes você tem para multicor.
+
+### Análise de foto
+
+Sobe uma foto do personagem e a página diz quantos filamentos a peça exige, quais cores, quanto de cada uma e se você tem em estoque.
+
+**Como funciona, sem enfeite:** é quantização de cor por k-means no espaço **OKLab**, rodando no navegador — nenhuma imagem sai do computador. Não é reconhecimento de objeto: o programa lê as cores que dominam a imagem, não entende que "aquilo é o cabelo do personagem".
+
+- O fundo é estimado pelos quatro cantos da foto e descartado (desativável).
+- Grupos abaixo de 2% dos pixels são descartados e, no modo automático, cores perceptualmente equivalentes (ΔE < 12) são fundidas — senão bordas serrilhadas viram filamentos fantasma.
+- Cada cor é comparada ao estoque por distância perceptual: ΔE ≤ 10 conta como "tem", até 22 como "só parecida".
+- As gramas por cor saem do peso da peça na calculadora, rateado pela fatia de pixels.
+- Acima de 4 cores, avisa que o ACE trabalha com 4 por vez.
+
+Um botão desconta do estoque as gramas estimadas de cada cor.
+
 ## Catálogo
 
 Terceira aba. Categorias livres (Anime, Games, Marvel, DC, Carros…), cada uma com capa horizontal ou vertical e quantos produtos você quiser. Cada produto tem foto, descrição e uma lista de tamanhos com preço próprio — 15 cm, 20 cm, 25 cm, 30 cm — e três modos de exibição: **a partir de** (mostra o menor preço), **preço único** ou **sob consulta**.

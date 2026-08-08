@@ -276,6 +276,28 @@ textarea:focus{outline:none; border-color:var(--accent); background:var(--surfac
 footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--muted); font-size:12.5px; line-height:1.6}
 @media (prefers-reduced-motion: reduce){ *{transition:none !important} }
 
+/* ---------- estoque e análise de cores ---------- */
+input.cor{width:34px; height:26px; padding:0; border:1px solid var(--line-strong); border-radius:6px; background:var(--surface-2); cursor:pointer}
+input.cel{
+  background:var(--surface-2); border:1px solid var(--line-strong); border-radius:6px; color:var(--ink);
+  padding:5px 7px; font-size:13px; font-family:var(--font-ui); width:100%; min-width:70px;
+}
+input.cel.n{font-family:var(--font-mono); text-align:right; font-variant-numeric:tabular-nums}
+input.cel:focus{outline:none; border-color:var(--accent)}
+tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
+.cores-lista{display:flex; flex-direction:column; gap:10px; margin-top:14px}
+.cor-l{display:flex; align-items:center; gap:12px; padding:10px; border:1px solid var(--line); border-radius:9px; background:var(--surface-2); flex-wrap:wrap}
+.cor-am{width:44px; height:44px; border-radius:7px; flex:none; border:1px solid var(--line-strong)}
+.cor-inf{flex:1; min-width:190px}
+.cor-inf .t{font-size:14px; font-weight:600}
+.cor-inf .s{font-size:12px; color:var(--ink-2); margin-top:2px; line-height:1.45}
+.cor-st{font-size:12.5px; font-weight:600; white-space:nowrap}
+.cor-st.ok{color:var(--good)} .cor-st.quase{color:var(--warn)} .cor-st.nao{color:var(--bad)}
+.resumo-an{
+  padding:12px 14px; border-radius:9px; background:var(--accent-soft); border:1px solid var(--accent);
+  font-size:13.5px; line-height:1.55; margin-top:14px;
+}
+
 /* ---------- editor de catálogo ---------- */
 .cat{background:var(--surface); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); margin-bottom:14px}
 .cat-hd{display:flex; align-items:flex-start; gap:12px; padding:13px 15px; border-bottom:1px solid var(--line); flex-wrap:wrap}
@@ -446,6 +468,7 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
     <button class="tab on" id="tabCalc" type="button">Calculadora</button>
     <button class="tab" id="tabGestao" type="button">Pedidos e painel</button>
     <button class="tab" id="tabCatalogo" type="button">Catálogo</button>
+    <button class="tab" id="tabEstoque" type="button">Estoque e cores</button>
     <span class="tab-badge" id="tabBadge"></span>
   </nav>
 </header>
@@ -969,6 +992,67 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
   <div id="listaCat"></div>
 </div>
 
+<!-- ============ ESTOQUE E CORES ============ -->
+<div id="viewEstoque" hidden>
+
+  <div class="tiles" id="tilesEstoque"></div>
+
+  <section class="card">
+    <header>
+      <h2>Rolos em estoque</h2>
+      <span class="hint">
+        alerta abaixo de
+        <input type="text" inputmode="decimal" id="estoqueMin" value="150" style="width:56px; text-align:right;
+          background:var(--surface-2); border:1px solid var(--line-strong); border-radius:5px; padding:2px 5px;
+          font-family:var(--font-mono); font-size:12px; color:var(--ink)"> g
+      </span>
+    </header>
+    <div class="body">
+      <button class="btn primary" type="button" id="btnNovoRolo" style="align-self:flex-start">+ Rolo</button>
+      <div style="overflow-x:auto"><table class="lib" id="tabelaEstoque"></table></div>
+      <p class="note">Dê baixa editando as gramas direto na tabela, ou use a análise de foto abaixo para descontar o consumo estimado de cada cor de uma vez.</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <header><h2>Analisar foto do personagem</h2><span class="hint" id="hintAnalise"></span></header>
+    <div class="body">
+      <div class="row">
+        <div class="f">
+          <label>Foto de referência</label>
+          <div class="upload" id="boxAnalise">
+            <img id="prevAnalise" alt="Foto analisada" hidden>
+            <span class="ph" id="phAnalise">Foto do personagem, arte oficial ou render do modelo</span>
+            <div class="upload-acts">
+              <button class="btn tiny" type="button" id="btnAnaliseFoto">Escolher foto</button>
+            </div>
+          </div>
+          <input type="file" id="fileAnalise" accept="image/*" hidden>
+        </div>
+        <div class="f">
+          <label for="nCores">Quantas cores separar</label>
+          <select id="nCores">
+            <option value="0">Automático</option>
+            <option value="1">1 filamento</option>
+            <option value="2">2 filamentos</option>
+            <option value="3">3 filamentos</option>
+            <option value="4">4 filamentos</option>
+            <option value="5">5 filamentos</option>
+            <option value="6">6 filamentos</option>
+          </select>
+          <label style="display:flex; align-items:center; gap:7px; margin-top:9px; font-weight:400; cursor:pointer">
+            <input type="checkbox" id="ignoraFundo" checked style="width:auto; margin:0">
+            <span style="font-size:12.5px; color:var(--ink-2)">Ignorar o fundo da foto</span>
+          </label>
+          <span class="sub" id="subFundo"></span>
+        </div>
+      </div>
+      <div id="saidaAnalise"></div>
+    </div>
+  </section>
+
+</div>
+
 </div>
 
 <div id="tip"></div>
@@ -1390,6 +1474,49 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
     if(idx > -1) a[idx] = reg; else a.push(reg);
     setLib(a);
   });
+
+  /* ---------- cor: OKLab ----------
+     Distância perceptual. Em RGB, dois vermelhos distantes na tela parecem
+     iguais no olho e vice-versa; OKLab aproxima o que a gente enxerga. */
+  function srgbOklab(r, g, b){
+    var f = function(c){ c /= 255; return c <= 0.04045 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); };
+    var R = f(r), G = f(g), B = f(b);
+    var l = Math.cbrt(0.4122214708*R + 0.5363325363*G + 0.0514459929*B);
+    var m = Math.cbrt(0.2119034982*R + 0.6806995451*G + 0.1073969566*B);
+    var s = Math.cbrt(0.0883024619*R + 0.2817188376*G + 0.6299787005*B);
+    return [
+      0.2104542553*l + 0.7936177850*m - 0.0040720468*s,
+      1.9779984951*l - 2.4285922050*m + 0.4505937099*s,
+      0.0259040371*l + 0.7827717662*m - 0.8086757660*s
+    ];
+  }
+  function dE(a, b){
+    var dl = (a[0]-b[0])*100, da = (a[1]-b[1])*100, db = (a[2]-b[2])*100;
+    return Math.sqrt(dl*dl + da*da + db*db);
+  }
+  function hexRgb(h){
+    h = String(h||'').replace('#','');
+    if(h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+    return [parseInt(h.slice(0,2),16)||0, parseInt(h.slice(2,4),16)||0, parseInt(h.slice(4,6),16)||0];
+  }
+  function rgbHex(r, g, b){
+    return '#' + [r,g,b].map(function(v){ return Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0'); }).join('');
+  }
+  // Nome aproximado, só para dar um rótulo humano ao resultado.
+  function nomeCor(r, g, b){
+    var mx = Math.max(r,g,b), mn = Math.min(r,g,b), d = mx-mn, v = mx/255, sat = mx ? d/mx : 0;
+    if(sat < 0.12) return v > 0.85 ? 'Branco' : v > 0.6 ? 'Cinza claro' : v > 0.3 ? 'Cinza' : 'Preto';
+    var h = 0;
+    if(mx === r) h = 60*(((g-b)/d)%6);
+    else if(mx === g) h = 60*(((b-r)/d)+2);
+    else h = 60*(((r-g)/d)+4);
+    if(h < 0) h += 360;
+    var nome = h < 15 ? 'Vermelho' : h < 40 ? 'Laranja' : h < 68 ? 'Amarelo' : h < 160 ? 'Verde'
+             : h < 200 ? 'Ciano' : h < 255 ? 'Azul' : h < 290 ? 'Roxo' : h < 335 ? 'Rosa' : 'Vermelho';
+    if(v < 0.35) nome += ' escuro';
+    else if(v > 0.85 && sat < 0.4) nome += ' claro';
+    return nome;
+  }
 
   /* ---------- banco de imagens do catálogo (IndexedDB) ----------
      Catálogo com dezenas de fotos passa longe dos ~5 MB do localStorage.
@@ -2217,15 +2344,349 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
     setTimeout(function(){ document.title = titulo; delete document.body.dataset.imprimir; }, 700);
   });
 
+  /* ---------- estoque de filamento ---------- */
+  function estoque(){ try{ return JSON.parse(load('p3d.estoque.v1')||'[]'); }catch(e){ return []; } }
+  function setEstoque(a, redesenha){
+    store('p3d.estoque.v1', JSON.stringify(a));
+    if(redesenha !== false) renderEstoque();
+  }
+
+  function renderEstoque(){
+    var rolos = estoque();
+    var minimo = parseNum($('estoqueMin').value);
+    var gramas = 0, valor = 0, baixos = 0;
+    rolos.forEach(function(x){
+      var g = parseNum(x.g);
+      gramas += g;
+      valor += g/1000 * parseNum(x.preco);
+      if(g < minimo) baixos++;
+    });
+
+    $('tilesEstoque').innerHTML = [
+      {k:'Filamento em estoque', v:num(gramas/1000,2)+' kg', cls:'accent', n:rolos.length + ' rolo(s) cadastrado(s)'},
+      {k:'Valor parado em estoque', v:money(valor), cls:'', n:'ao preço que você pagou'},
+      {k:'Rolos acabando', v:String(baixos), cls:(baixos ? 'bad' : 'good'), n:'abaixo de ' + num(minimo,0) + ' g'},
+      {k:'Cores diferentes', v:String(Object.keys(rolos.reduce(function(k,x){ k[(x.hex||'').toLowerCase()]=1; return k; },{})).length), cls:'', n:'disponíveis para multicor'}
+    ].map(function(t){
+      return '<div class="tile"><div class="k">'+t.k+'</div><div class="v '+t.cls+'">'+t.v+'</div><div class="n">'+t.n+'</div></div>';
+    }).join('');
+
+    var t = $('tabelaEstoque');
+    if(!rolos.length){
+      t.innerHTML = '<tbody><tr><td class="empty">Nenhum rolo cadastrado. Clique em “+ Rolo” e cadastre o que veio no combo.</td></tr></tbody>';
+      return;
+    }
+    t.innerHTML =
+      '<thead><tr><th>Cor</th><th>Nome</th><th>Tipo</th><th>Marca</th><th class="n">Restante</th>'+
+      '<th class="n">R$/kg</th><th class="n">Valor</th><th></th></tr></thead><tbody>' +
+      rolos.map(function(x, i){
+        var g = parseNum(x.g);
+        return '<tr'+(g < minimo ? ' class="baixo"' : '')+'>'+
+          '<td><input class="cor" type="color" data-i="'+i+'" data-f="hex" value="'+(x.hex||'#cccccc')+'"></td>'+
+          '<td><input class="cel" type="text" data-i="'+i+'" data-f="nome" value="'+escapa(x.nome||'')+'" placeholder="Vermelho fosco"></td>'+
+          '<td><input class="cel" type="text" data-i="'+i+'" data-f="tipo" value="'+escapa(x.tipo||'')+'" placeholder="PLA" style="min-width:60px"></td>'+
+          '<td><input class="cel" type="text" data-i="'+i+'" data-f="marca" value="'+escapa(x.marca||'')+'" placeholder="Anycubic" style="min-width:80px"></td>'+
+          '<td class="n"><input class="cel n" type="text" inputmode="decimal" data-i="'+i+'" data-f="g" value="'+escapa(x.g||'')+'" style="width:78px"> g</td>'+
+          '<td class="n"><input class="cel n" type="text" inputmode="decimal" data-i="'+i+'" data-f="preco" value="'+escapa(x.preco||'')+'" style="width:78px"></td>'+
+          '<td class="n">'+money(g/1000 * parseNum(x.preco))+'</td>'+
+          '<td><div class="acts"><button class="btn tiny ghost" data-rmrolo="'+i+'" type="button">Excluir</button></div></td></tr>';
+      }).join('') + '</tbody>';
+  }
+
+  $('tabelaEstoque').addEventListener('input', function(e){
+    var el = e.target, i = el.dataset.i;
+    if(i === undefined) return;
+    var a = estoque();
+    if(!a[i]) return;
+    a[i][el.dataset.f] = el.value;
+    // Redesenhar a cada tecla tiraria o foco do campo; só o resumo é atualizado.
+    setEstoque(a, false);
+    if(el.dataset.f === 'g' || el.dataset.f === 'preco' || el.dataset.f === 'hex') renderResumoEstoque();
+  });
+  function renderResumoEstoque(){
+    var guarda = document.activeElement;
+    renderEstoque();
+    if(guarda && guarda.dataset && guarda.dataset.i !== undefined){
+      var volta = $('tabelaEstoque').querySelector('[data-i="'+guarda.dataset.i+'"][data-f="'+guarda.dataset.f+'"]');
+      if(volta){ volta.focus(); if(volta.setSelectionRange && volta.type === 'text') volta.setSelectionRange(volta.value.length, volta.value.length); }
+    }
+  }
+  $('tabelaEstoque').addEventListener('click', function(e){
+    var b = e.target.closest('[data-rmrolo]');
+    if(!b) return;
+    var a = estoque();
+    a.splice(b.dataset.rmrolo, 1);
+    setEstoque(a);
+  });
+  $('btnNovoRolo').addEventListener('click', function(){
+    var a = estoque();
+    a.push({hex:'#cccccc', nome:'', tipo:'PLA', marca:'', g:'1000', preco:num(val('precoKg'),2)});
+    setEstoque(a);
+  });
+  $('estoqueMin').addEventListener('input', function(){ store('p3d.estoqueMin', this.value); renderEstoque(); });
+
+  /* ---------- análise de cores da foto ----------
+     Quantização k-means em OKLab, tudo no navegador. Não reconhece o
+     personagem: lê as cores que dominam a imagem e compara com o estoque. */
+  var ultimaAnalise = null;
+
+  function amostraPixels(img, ignorarFundo){
+    var lado = 150;
+    var esc = Math.min(1, lado/Math.max(img.width, img.height));
+    var cv = document.createElement('canvas');
+    cv.width = Math.max(1, Math.round(img.width*esc));
+    cv.height = Math.max(1, Math.round(img.height*esc));
+    var ctx = cv.getContext('2d', {willReadFrequently:true});
+    ctx.drawImage(img, 0, 0, cv.width, cv.height);
+    var d = ctx.getImageData(0, 0, cv.width, cv.height).data;
+    var W = cv.width, H = cv.height;
+
+    // O fundo é estimado pelos quatro cantos da foto.
+    var cantos = [];
+    if(ignorarFundo){
+      [[2,2],[W-3,2],[2,H-3],[W-3,H-3]].forEach(function(p){
+        var k = (p[1]*W + p[0])*4;
+        cantos.push(srgbOklab(d[k], d[k+1], d[k+2]));
+      });
+    }
+
+    var pts = [], fundo = 0, total = 0;
+    for(var y = 0; y < H; y++){
+      for(var x = 0; x < W; x++){
+        var k = (y*W + x)*4;
+        if(d[k+3] < 128) continue;
+        total++;
+        var lab = srgbOklab(d[k], d[k+1], d[k+2]);
+        if(cantos.length && cantos.some(function(c){ return dE(lab, c) < 14; })){ fundo++; continue; }
+        pts.push(lab);
+      }
+    }
+    return {pts:pts, fundo:fundo, total:total};
+  }
+
+  function kmeans(pts, k){
+    if(!pts.length) return [];
+    // Sementes espalhadas por luminosidade, para não cair todas no mesmo tom.
+    var ord = pts.slice().sort(function(a,b){ return a[0]-b[0]; });
+    var cent = [];
+    for(var i = 0; i < k; i++) cent.push(ord[Math.floor((i+0.5)/k * ord.length)].slice());
+
+    var atrib = new Array(pts.length);
+    for(var it = 0; it < 14; it++){
+      var mudou = false;
+      for(var p = 0; p < pts.length; p++){
+        var melhor = 0, dm = Infinity;
+        for(var c = 0; c < k; c++){
+          var dd = dE(pts[p], cent[c]);
+          if(dd < dm){ dm = dd; melhor = c; }
+        }
+        if(atrib[p] !== melhor){ atrib[p] = melhor; mudou = true; }
+      }
+      var som = [], cnt = [];
+      for(var c2 = 0; c2 < k; c2++){ som.push([0,0,0]); cnt.push(0); }
+      for(var q = 0; q < pts.length; q++){
+        var g = atrib[q];
+        som[g][0] += pts[q][0]; som[g][1] += pts[q][1]; som[g][2] += pts[q][2];
+        cnt[g]++;
+      }
+      for(var c3 = 0; c3 < k; c3++){
+        if(cnt[c3]) cent[c3] = [som[c3][0]/cnt[c3], som[c3][1]/cnt[c3], som[c3][2]/cnt[c3]];
+      }
+      if(!mudou) break;
+    }
+
+    var res = [], inercia = 0;
+    for(var c4 = 0; c4 < k; c4++) res.push({lab:cent[c4], n:0});
+    for(var w = 0; w < pts.length; w++){
+      res[atrib[w]].n++;
+      inercia += dE(pts[w], cent[atrib[w]]);
+    }
+    res.inercia = inercia/pts.length;
+    return res.filter(function(x){ return x.n > 0; }).sort(function(a,b){ return b.n-a.n; });
+  }
+
+  // Bordas serrilhadas e sombras geram grupos fantasma. Descarta os residuais e,
+  // no modo automático, funde os que o olho não distinguiria como outro filamento.
+  function limpaGrupos(gr, total, fundir){
+    var vivos = gr.filter(function(g){ return g.n/total >= 0.02; });
+    if(!vivos.length) vivos = gr.slice(0, 1);
+    if(fundir){
+      var mudou = true;
+      while(mudou && vivos.length > 1){
+        mudou = false;
+        for(var i = 0; i < vivos.length && !mudou; i++){
+          for(var j = i+1; j < vivos.length; j++){
+            if(dE(vivos[i].lab, vivos[j].lab) < 12){
+              var n = vivos[i].n + vivos[j].n;
+              vivos[i] = {n:n, lab:[0,1,2].map(function(c){
+                return (vivos[i].lab[c]*vivos[i].n + vivos[j].lab[c]*vivos[j].n) / n;
+              })};
+              vivos.splice(j, 1);
+              mudou = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+    return vivos.sort(function(a,b){ return b.n-a.n; });
+  }
+
+  // Sem k definido, procura o ponto onde separar mais uma cor deixa de compensar.
+  function melhorK(pts){
+    var ant = null, escolha = 1;
+    for(var k = 1; k <= 5; k++){
+      var g = kmeans(pts, k);
+      if(ant !== null && (ant - g.inercia)/ant < 0.22) break;
+      ant = g.inercia; escolha = k;
+      if(g.inercia < 4) break;
+    }
+    return escolha;
+  }
+
+  function analisaFoto(){
+    var el = $('prevAnalise');
+    if(!el.src || el.hidden) return;
+    var im = new Image();
+    im.onload = function(){
+      var am = amostraPixels(im, $('ignoraFundo').checked);
+      if(am.pts.length < 40){
+        $('saidaAnalise').innerHTML = '<p class="note">Sobraram pixels demais no fundo — quase nada da peça restou para analisar. Desmarque “ignorar o fundo” e tente de novo.</p>';
+        $('subFundo').textContent = '';
+        return;
+      }
+      var pedido = parseInt($('nCores').value, 10);
+      var k = pedido || melhorK(am.pts);
+      var grupos = limpaGrupos(kmeans(am.pts, k), am.pts.length, !pedido);
+      ultimaAnalise = grupos.map(function(g){
+        return {pct:g.n/am.pts.length, hex:oklabHex(g.lab), lab:g.lab};
+      });
+      $('subFundo').textContent = am.total
+        ? num(am.fundo/am.total*100, 0) + '% da foto foi tratada como fundo'
+        : '';
+      mostraAnalise();
+    };
+    im.src = el.src;
+  }
+
+  // OKLab -> sRGB (inversa direta da conversão acima).
+  function oklabHex(lab){
+    var l_ = lab[0] + 0.3963377774*lab[1] + 0.2158037573*lab[2];
+    var m_ = lab[0] - 0.1055613458*lab[1] - 0.0638541728*lab[2];
+    var s_ = lab[0] - 0.0894841775*lab[1] - 1.2914855480*lab[2];
+    var l = l_*l_*l_, m = m_*m_*m_, s = s_*s_*s_;
+    var R =  4.0767416621*l - 3.3077115913*m + 0.2309699292*s;
+    var G = -1.2684380046*l + 2.6097574011*m - 0.3413193965*s;
+    var B = -0.0041960863*l - 0.7034186147*m + 1.7076147010*s;
+    var f = function(c){ c = c <= 0.0031308 ? 12.92*c : 1.055*Math.pow(Math.max(0,c), 1/2.4) - 0.055; return c*255; };
+    return rgbHex(f(R), f(G), f(B));
+  }
+
+  function mostraAnalise(){
+    if(!ultimaAnalise){ $('saidaAnalise').innerHTML = ''; $('hintAnalise').textContent = ''; return; }
+    var rolos = estoque().map(function(x){
+      return {nome:x.nome || nomeCor.apply(null, hexRgb(x.hex)), hex:x.hex, g:parseNum(x.g),
+              tipo:x.tipo, lab:srgbOklab.apply(null, hexRgb(x.hex))};
+    });
+    var gramasPeca = (val('gramasPeca') + val('gramasPurga')) / Math.max(1, val('pecasPorLote'));
+    var faltando = 0, temTudo = 0;
+
+    var linhas = ultimaAnalise.map(function(c){
+      var rgb = hexRgb(c.hex);
+      var g = gramasPeca * c.pct;
+      var perto = null, dist = Infinity;
+      rolos.forEach(function(x){
+        var d = dE(c.lab, x.lab);
+        if(d < dist){ dist = d; perto = x; }
+      });
+      var st, cls, det;
+      if(!perto){ st = 'Sem estoque cadastrado'; cls = 'nao'; faltando++; }
+      else if(dist <= 10){
+        var minimo = parseNum($('estoqueMin').value);
+        if(perto.g < g){ st = 'Cor certa, filamento curto'; cls = 'quase'; faltando++; }
+        else if(perto.g < minimo){ st = 'Tem, mas o rolo está acabando'; cls = 'quase'; temTudo++; }
+        else { st = 'Tem em estoque'; cls = 'ok'; temTudo++; }
+      } else if(dist <= 22){ st = 'Só tem parecida'; cls = 'quase'; faltando++; }
+      else { st = 'Não tem essa cor'; cls = 'nao'; faltando++; }
+      det = perto
+        ? perto.nome + ' · ' + num(perto.g,0) + ' g' + (dist <= 10 ? '' : ' · diferença perceptível')
+        : 'cadastre seus rolos acima';
+
+      return '<div class="cor-l">' +
+        '<span class="cor-am" style="background:'+c.hex+'"></span>' +
+        '<div class="cor-inf">' +
+          '<div class="t">' + nomeCor(rgb[0],rgb[1],rgb[2]) + ' <span style="font-family:var(--font-mono);font-weight:400;color:var(--muted);font-size:12px">'+c.hex+'</span></div>' +
+          '<div class="s">' + num(c.pct*100,0) + '% da peça' +
+            (gramasPeca > 0 ? ' · aproximadamente <b>' + num(g,0) + ' g</b>' : '') +
+            ' &nbsp;·&nbsp; ' + det + '</div>' +
+        '</div>' +
+        '<span class="cor-st '+cls+'">' + st + '</span>' +
+      '</div>';
+    }).join('');
+
+    var n = ultimaAnalise.length;
+    var aviso = n > 4
+      ? '<br>São <b>' + n + ' cores</b> — o ACE trabalha com 4 por vez. Vale simplificar a separação, imprimir em duas partes ou pintar os detalhes menores à mão.'
+      : '';
+    var falta = faltando > 0
+      ? '<br>Faltam <b>' + faltando + '</b> de ' + n + '. Veja a lista para saber quais.'
+      : '<br>Você tem todas em estoque, com filamento suficiente.';
+
+    $('saidaAnalise').innerHTML =
+      '<div class="cores-lista">' + linhas + '</div>' +
+      '<div class="resumo-an">Esta peça sairia com <b>' + n + ' filamento' + (n===1?'':'s') + '</b>.' + falta + aviso + '</div>' +
+      (temTudo && gramasPeca > 0
+        ? '<button class="btn" type="button" id="btnBaixa" style="margin-top:12px">Dar baixa das gramas estimadas no estoque</button>'
+        : '');
+    $('hintAnalise').textContent = n + ' cor(es) · ' + num(gramasPeca,0) + ' g estimados';
+
+    var bb = $('btnBaixa');
+    if(bb) bb.addEventListener('click', function(){
+      var a = estoque();
+      ultimaAnalise.forEach(function(c){
+        var melhor = -1, dist = Infinity;
+        a.forEach(function(x, i){
+          var d = dE(c.lab, srgbOklab.apply(null, hexRgb(x.hex)));
+          if(d < dist){ dist = d; melhor = i; }
+        });
+        if(melhor > -1 && dist <= 10){
+          a[melhor].g = num(Math.max(0, parseNum(a[melhor].g) - gramasPeca*c.pct), 0);
+        }
+      });
+      setEstoque(a);
+      this.textContent = 'Baixa registrada';
+      this.disabled = true;
+    });
+  }
+
+  $('btnAnaliseFoto').addEventListener('click', function(){ $('fileAnalise').click(); });
+  $('fileAnalise').addEventListener('change', function(e){
+    var f = e.target.files[0]; e.target.value = '';
+    if(!f) return;
+    var b = $('btnAnaliseFoto');
+    b.textContent = 'Analisando…';
+    processaImagem(f, 900, false, function(dado){
+      b.textContent = 'Trocar foto';
+      if(!dado) return;
+      $('prevAnalise').src = dado;
+      $('prevAnalise').hidden = false;
+      $('phAnalise').hidden = true;
+      analisaFoto();
+    });
+  });
+  $('nCores').addEventListener('change', analisaFoto);
+  $('ignoraFundo').addEventListener('change', analisaFoto);
+
   /* ---------- abas ---------- */
   function trocaAba(qual){
-    ['calc','gestao','catalogo'].forEach(function(v){
+    ['calc','gestao','catalogo','estoque'].forEach(function(v){
       var nome = v.charAt(0).toUpperCase() + v.slice(1);
       $('view' + nome).hidden = (v !== qual);
       $('tab' + nome).classList.toggle('on', v === qual);
     });
     if(qual === 'gestao') renderGestao();
     if(qual === 'catalogo') renderCatalogo();
+    if(qual === 'estoque'){ renderEstoque(); mostraAnalise(); }
     store('p3d.aba', qual);
   }
   ['calc','gestao','catalogo'].forEach(function(v){
@@ -2254,7 +2715,7 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
   $('btnExport').addEventListener('click', function(){
     var blob = new Blob([JSON.stringify({
       estado:estado(), lib:lib(), imgs:imgs, pedidos:pedidos(),
-      catalogo:catalogo(), catImgs:imgCache
+      catalogo:catalogo(), catImgs:imgCache, estoque:estoque()
     }, null, 2)], {type:'application/json'});
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
@@ -2275,6 +2736,7 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
           Object.keys(o.catImgs).forEach(function(k){ imgSalva(k, o.catImgs[k]); });
         }
         if(o.catalogo) setCatalogo(o.catalogo);
+        if(o.estoque) setEstoque(o.estoque);
         if(o.imgs){
           if(o.imgs.logo !== undefined) guardaImagem('logo', o.imgs.logo, $('btnLogo'), 'Trocar');
           if(o.imgs.foto !== undefined) guardaImagem('foto', o.imgs.foto, $('btnFoto'), 'Trocar');
@@ -2326,8 +2788,11 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
   renderLib();
   render();
   renderGestao();
+  var minEst = load('p3d.estoqueMin');
+  if(minEst) $('estoqueMin').value = minEst;
+  renderEstoque();
   var aba = load('p3d.aba');
-  trocaAba(['gestao','catalogo'].indexOf(aba) > -1 ? aba : 'calc');
+  trocaAba(['gestao','catalogo','estoque'].indexOf(aba) > -1 ? aba : 'calc');
   imgCarregaTudo().then(renderCatalogo);
 })();
 </script>
