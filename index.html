@@ -276,6 +276,86 @@ textarea:focus{outline:none; border-color:var(--accent); background:var(--surfac
 footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--muted); font-size:12.5px; line-height:1.6}
 @media (prefers-reduced-motion: reduce){ *{transition:none !important} }
 
+/* ---------- editor de catálogo ---------- */
+.cat{background:var(--surface); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); margin-bottom:14px}
+.cat-hd{display:flex; align-items:flex-start; gap:12px; padding:13px 15px; border-bottom:1px solid var(--line); flex-wrap:wrap}
+.cat-capa{
+  width:96px; height:64px; flex:none; border-radius:7px; border:1px dashed var(--line-strong);
+  background:var(--surface-2); display:flex; align-items:center; justify-content:center; overflow:hidden;
+  font-size:10.5px; color:var(--muted); text-align:center; padding:4px; cursor:pointer;
+}
+.cat-capa.v{width:64px; height:88px}
+.cat-capa img{width:100%; height:100%; object-fit:cover; display:block}
+.cat-meta{flex:1; min-width:200px; display:flex; flex-direction:column; gap:7px}
+.cat-meta .l1{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+.cat-nome{
+  flex:1; min-width:150px; background:transparent; border:0; border-bottom:1px solid var(--line-strong);
+  color:var(--ink); font-family:var(--font-display); font-size:19px; font-weight:600; letter-spacing:.02em;
+  padding:2px 0;
+}
+.cat-nome:focus{outline:none; border-bottom-color:var(--accent)}
+.cat-acts{display:flex; gap:6px; flex-wrap:wrap; align-items:center}
+.cat-body{padding:12px 15px 15px; display:flex; flex-direction:column; gap:11px}
+.prod-ed{border:1px solid var(--line); border-radius:9px; padding:11px; display:flex; gap:11px; background:var(--surface-2); flex-wrap:wrap}
+.prod-foto{
+  width:82px; height:82px; flex:none; border-radius:7px; border:1px dashed var(--line-strong);
+  background:var(--surface); display:flex; align-items:center; justify-content:center; overflow:hidden;
+  font-size:10px; color:var(--muted); text-align:center; padding:4px; cursor:pointer;
+}
+.prod-foto img{width:100%; height:100%; object-fit:cover; display:block}
+.prod-campos{flex:1; min-width:230px; display:flex; flex-direction:column; gap:7px}
+.prod-campos input[type=text], .prod-campos select{
+  background:var(--surface); border:1px solid var(--line-strong); border-radius:7px; color:var(--ink);
+  padding:6px 9px; font-size:13.5px; font-family:var(--font-ui); width:100%;
+}
+.prod-campos input:focus, .prod-campos select:focus{outline:none; border-color:var(--accent)}
+.vars{display:flex; flex-direction:column; gap:5px}
+.var-l{display:flex; gap:6px; align-items:center}
+.var-l input.t{flex:1; min-width:0}
+.var-l input.p{width:110px; flex:none; font-family:var(--font-mono); text-align:right}
+.preco-lab{font-family:var(--font-mono); font-size:12.5px; color:var(--accent); font-weight:700; white-space:nowrap}
+.linha-topo{display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:space-between}
+
+/* ---------- folha de catálogo (só na impressão / PDF) ---------- */
+#catalogoPrint{display:none}
+.cpg{
+  width:210mm; min-height:297mm; padding:15mm; margin:0 auto; background:#fff; color:#14181d;
+  font-family:var(--font-ui); font-size:10pt; line-height:1.45; display:flex; flex-direction:column;
+  page-break-after:always; break-after:page;
+}
+.cpg:last-child{page-break-after:auto; break-after:auto}
+.cpg *{box-sizing:border-box}
+/* capa do catálogo */
+.cpg.capa{align-items:center; justify-content:center; text-align:center; gap:0}
+.cpg.capa .logo{max-height:34mm; max-width:96mm; object-fit:contain; margin-bottom:10mm}
+.cpg.capa .marca{font-family:var(--font-display); font-size:24pt; font-weight:600; letter-spacing:.03em}
+.cpg.capa .tit{font-family:var(--font-display); font-size:44pt; font-weight:600; letter-spacing:.2em; color:#c8480a; margin:6mm 0 0; line-height:1}
+.cpg.capa .sub{font-size:11pt; color:#4a5560; margin-top:5mm; max-width:120mm}
+.cpg.capa .rule{width:38mm; height:2.5pt; background:#c8480a; border-radius:1pt; margin:9mm 0}
+.cpg.capa .ct{font-family:var(--font-mono); font-size:10pt; color:#4a5560; line-height:1.7}
+/* página de categoria */
+.cat-cap{display:flex; gap:8mm; align-items:flex-end; margin-bottom:7mm}
+.cat-cap.h{flex-direction:column; align-items:stretch; gap:4mm}
+.cat-cap.h img{width:100%; height:52mm; object-fit:cover; border-radius:2mm; display:block}
+.cat-cap.v img{width:52mm; height:72mm; object-fit:cover; border-radius:2mm; flex:none; display:block}
+.cat-cap .tit{flex:1; min-width:0}
+.cat-cap .nome{font-family:var(--font-display); font-size:26pt; font-weight:600; letter-spacing:.03em; line-height:1.05}
+.cat-cap .cnt{font-family:var(--font-display); font-size:8.5pt; letter-spacing:.16em; text-transform:uppercase; color:#6b7481; margin-top:2mm}
+.cat-rule{height:2pt; background:#c8480a; border-radius:1pt; margin-bottom:6mm}
+.prods{display:grid; grid-template-columns:1fr 1fr; gap:6mm}
+.prod{display:flex; gap:4mm; break-inside:avoid; page-break-inside:avoid}
+.prod img{width:30mm; height:30mm; object-fit:cover; border-radius:1.5mm; flex:none; border:.75pt solid #e4e8ec}
+.prod .nm{font-size:11pt; font-weight:600; line-height:1.2}
+.prod .ds{font-size:8.5pt; color:#6b7481; line-height:1.4; margin-top:1mm}
+.prod .tam{font-family:var(--font-mono); font-size:8.5pt; color:#4a5560; line-height:1.6; margin-top:1.5mm}
+.prod .pr{font-family:var(--font-mono); font-size:10pt; font-weight:700; color:#c8480a; margin-top:1.5mm}
+.cpg .rodape{
+  margin-top:auto; padding-top:6mm; border-top:.75pt solid #e4e8ec;
+  display:flex; justify-content:space-between; gap:6mm; font-size:8.5pt; color:#6b7481;
+}
+.cpg .cond{margin-top:8mm; display:grid; grid-template-columns:repeat(3,1fr); gap:6mm}
+.cpg .cond .v{font-size:10.5pt; font-weight:600; margin-top:.5mm}
+
 /* ---------- folha de orçamento (só na impressão / PDF) ---------- */
 #orcamento{display:none}
 .sheet{
@@ -328,8 +408,10 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
 @media print{
   html,body{background:#fff !important}
   header.top, .wrap, footer.foot, #tip{display:none !important}
-  #orcamento{display:block !important}
+  body[data-imprimir="orcamento"] #orcamento{display:block !important}
+  body[data-imprimir="catalogo"] #catalogoPrint{display:block !important}
   .sheet{width:auto; min-height:auto; box-shadow:none; page-break-after:avoid}
+  .cpg{width:auto; min-height:auto; box-shadow:none}
   *{-webkit-print-color-adjust:exact !important; print-color-adjust:exact !important}
 }
 </style>
@@ -358,6 +440,7 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
   <nav class="tabs">
     <button class="tab on" id="tabCalc" type="button">Calculadora</button>
     <button class="tab" id="tabGestao" type="button">Pedidos e painel</button>
+    <button class="tab" id="tabCatalogo" type="button">Catálogo</button>
     <span class="tab-badge" id="tabBadge"></span>
   </nav>
 </header>
@@ -849,7 +932,7 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
     </div>
   </section>
 
-  <section class="card">
+  <section class="card" id="cardPedidos">
     <header>
       <h2>Pedidos</h2>
       <span class="hint"><select id="filtroStatus" style="width:auto; padding:4px 8px; font-size:12.5px">
@@ -866,6 +949,21 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
   </section>
 
 </div>
+
+<!-- ============ CATÁLOGO ============ -->
+<div id="viewCatalogo" hidden>
+  <div class="mes-bar">
+    <button class="btn primary" type="button" id="btnNovaCat">Nova categoria</button>
+    <button class="btn" type="button" id="btnCatPDF">Gerar catálogo em PDF</button>
+    <span class="tab-badge" id="catResumo" style="margin-left:0"></span>
+    <input type="file" id="fileCat" accept="image/*" hidden>
+  </div>
+  <p class="note" style="margin-bottom:16px">
+    Cada categoria vira uma página do catálogo. A capa <b>horizontal</b> entra como faixa larga no topo; a <b>vertical</b> entra ao lado do nome. Dentro de cada produto você cadastra os tamanhos com o preço de cada um — o catálogo mostra “a partir de” pelo menor deles.
+  </p>
+  <div id="listaCat"></div>
+</div>
+
 </div>
 
 <div id="tip"></div>
@@ -923,6 +1021,8 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
     <span id="shFoot2"></span>
   </div>
 </div></div>
+
+<div id="catalogoPrint"></div>
 
 <footer class="foot">
   <p>Os cálculos rodam no seu navegador e os dados ficam salvos neste dispositivo. Use <b>Exportar</b> para guardar uma cópia das peças salvas.</p>
@@ -1286,6 +1386,62 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
     setLib(a);
   });
 
+  /* ---------- banco de imagens do catálogo (IndexedDB) ----------
+     Catálogo com dezenas de fotos passa longe dos ~5 MB do localStorage.
+     Textos e preços ficam no localStorage; as imagens vêm para cá. */
+  var DB = null, imgCache = {}, idbOK = typeof indexedDB !== 'undefined';
+
+  function idb(){
+    return new Promise(function(res, rej){
+      if(DB) return res(DB);
+      if(!idbOK) return rej(new Error('sem indexedDB'));
+      var rq = indexedDB.open('precifica3d', 1);
+      rq.onupgradeneeded = function(){ rq.result.createObjectStore('img'); };
+      rq.onsuccess = function(){ DB = rq.result; res(DB); };
+      rq.onerror = function(){ idbOK = false; rej(rq.error); };
+    });
+  }
+  function imgCarregaTudo(){
+    if(!idbOK) return Promise.resolve();
+    return idb().then(function(db){
+      return new Promise(function(res){
+        var tx = db.transaction('img','readonly'), st = tx.objectStore('img');
+        var ks = st.getAllKeys(), vs = st.getAll();
+        tx.oncomplete = function(){
+          (ks.result||[]).forEach(function(k,i){ imgCache[k] = (vs.result||[])[i] || ''; });
+          res();
+        };
+        tx.onerror = function(){ res(); };
+      });
+    }).catch(function(){});
+  }
+  function imgSalva(k, v){
+    if(v) imgCache[k] = v; else delete imgCache[k];
+    if(!idbOK) return Promise.resolve();
+    return idb().then(function(db){
+      var tx = db.transaction('img','readwrite'), st = tx.objectStore('img');
+      if(v) st.put(v, k); else st.delete(k);
+      return new Promise(function(res){ tx.oncomplete = res; tx.onerror = res; });
+    }).catch(function(){});
+  }
+  function img(k){ return imgCache[k] || ''; }
+
+  /* ---------- catálogo ---------- */
+  function catalogo(){ try{ return JSON.parse(load('p3d.catalogo.v1')||'[]'); }catch(e){ return []; } }
+  function setCatalogo(a, redesenha){
+    store('p3d.catalogo.v1', JSON.stringify(a));
+    if(redesenha !== false) renderCatalogo();
+  }
+  function novoId(p){ return p + Date.now().toString(36) + Math.random().toString(36).slice(2,5); }
+
+  function precoDe(prod){
+    var ps = (prod.vars||[]).map(function(v){ return parseNum(v.p); }).filter(function(n){ return n > 0; });
+    if(prod.modo === 'consulta' || !ps.length) return {txt:'Sob consulta', v:0};
+    var min = Math.min.apply(null, ps);
+    if(prod.modo === 'unico' || ps.length === 1) return {txt:money(min), v:min};
+    return {txt:'A partir de ' + money(min), v:min};
+  }
+
   /* ---------- pedidos ---------- */
   var STATUS = {
     negociacao: 'Em negociação',
@@ -1503,9 +1659,11 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
     var cliente = texto('orcCliente').replace(/[^\wÀ-ÿ ]/g,'').trim();
     // O navegador usa o título da página como nome sugerido do arquivo PDF.
     document.title = 'Orcamento-' + numero.padStart(4,'0') + (cliente ? '-' + cliente.replace(/\s+/g,'-') : '');
+    document.body.dataset.imprimir = 'orcamento';
     window.print();
     setTimeout(function(){
       document.title = titulo;
+      delete document.body.dataset.imprimir;
       $('orcNumero').value = String(parseInt(numero,10) + 1);
       salvaEstado();
     }, 700);
@@ -1682,18 +1840,263 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
   $('btnNovoPedido').addEventListener('click', function(){ registraPedido(this, 'Registrar o cálculo atual'); });
   $('btnRegistrar').addEventListener('click', function(){ registraPedido(this, 'Registrar como pedido'); });
 
+  /* ---------- editor de catálogo ---------- */
+  var MODOS = {apartir:'A partir de (vários tamanhos)', unico:'Preço único', consulta:'Sob consulta'};
+
+  function renderCatalogo(){
+    var cats = catalogo();
+    var nProd = cats.reduce(function(k,c){ return k + (c.produtos||[]).length; }, 0);
+    $('catResumo').textContent = cats.length
+      ? cats.length + ' categoria(s) · ' + nProd + ' produto(s)'
+      : '';
+
+    if(!cats.length){
+      $('listaCat').innerHTML = '<div class="card"><div class="body"><p class="empty">' +
+        'Nenhuma categoria ainda. Clique em “Nova categoria” e comece por Anime, Games, Marvel, Carros — o que você mais imprime.</p></div></div>';
+      return;
+    }
+
+    $('listaCat').innerHTML = cats.map(function(c, ci){
+      var capa = img('c:' + c.id);
+      var prods = (c.produtos||[]).map(function(p, pi){
+        var foto = img('p:' + p.id);
+        var pr = precoDe(p);
+        var vars = (p.vars||[]).map(function(v, vi){
+          return '<div class="var-l">' +
+            '<input type="text" class="t" data-c="'+ci+'" data-p="'+pi+'" data-v="'+vi+'" data-f="t" value="'+escapa(v.t)+'" placeholder="15 cm">' +
+            '<input type="text" class="p" data-c="'+ci+'" data-p="'+pi+'" data-v="'+vi+'" data-f="p" value="'+escapa(v.p)+'" placeholder="0,00" inputmode="decimal">' +
+            '<button class="btn tiny ghost" data-rmvar="'+ci+'.'+pi+'.'+vi+'" type="button">×</button></div>';
+        }).join('');
+        return '<div class="prod-ed">' +
+          '<div class="prod-foto" data-foto="'+ci+'.'+pi+'">' + (foto ? '<img src="'+foto+'" alt="">' : 'Foto do produto') + '</div>' +
+          '<div class="prod-campos">' +
+            '<div class="linha-topo">' +
+              '<input type="text" data-c="'+ci+'" data-p="'+pi+'" data-f="nome" value="'+escapa(p.nome)+'" placeholder="Nome do produto" style="flex:1;min-width:140px">' +
+              '<span class="preco-lab" id="pl-'+ci+'-'+pi+'">'+pr.txt+'</span>' +
+              '<button class="btn tiny ghost" data-rmprod="'+ci+'.'+pi+'" type="button">Excluir</button>' +
+            '</div>' +
+            '<input type="text" data-c="'+ci+'" data-p="'+pi+'" data-f="desc" value="'+escapa(p.desc||'')+'" placeholder="Descrição curta: material, acabamento, base inclusa…">' +
+            '<select data-c="'+ci+'" data-p="'+pi+'" data-f="modo">' +
+              Object.keys(MODOS).map(function(k){ return '<option value="'+k+'"'+(p.modo===k?' selected':'')+'>'+MODOS[k]+'</option>'; }).join('') +
+            '</select>' +
+            '<div class="vars">' + vars + '</div>' +
+            '<button class="btn tiny" data-addvar="'+ci+'.'+pi+'" type="button" style="align-self:flex-start">+ Tamanho</button>' +
+          '</div></div>';
+      }).join('');
+
+      return '<div class="cat">' +
+        '<div class="cat-hd">' +
+          '<div class="cat-capa'+(c.orient==='v'?' v':'')+'" data-capa="'+ci+'">' + (capa ? '<img src="'+capa+'" alt="">' : 'Capa da categoria') + '</div>' +
+          '<div class="cat-meta">' +
+            '<div class="l1"><input class="cat-nome" type="text" data-c="'+ci+'" data-f="nome" value="'+escapa(c.nome)+'" placeholder="Nome da categoria"></div>' +
+            '<div class="cat-acts">' +
+              '<select data-c="'+ci+'" data-f="orient" class="st">' +
+                '<option value="h"'+(c.orient!=='v'?' selected':'')+'>Capa horizontal</option>' +
+                '<option value="v"'+(c.orient==='v'?' selected':'')+'>Capa vertical</option>' +
+              '</select>' +
+              '<button class="btn tiny" data-addprod="'+ci+'" type="button">+ Produto</button>' +
+              '<button class="btn tiny ghost" data-sobe="'+ci+'" type="button"'+(ci===0?' disabled':'')+'>↑</button>' +
+              '<button class="btn tiny ghost" data-desce="'+ci+'" type="button"'+(ci===cats.length-1?' disabled':'')+'>↓</button>' +
+              '<button class="btn tiny ghost" data-rmcat="'+ci+'" type="button">Excluir categoria</button>' +
+              '<span class="sub" style="margin-left:2px">'+(c.produtos||[]).length+' produto(s)</span>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="cat-body">' + (prods || '<p class="empty">Sem produtos nesta categoria.</p>') + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // Texto e preço atualizam o modelo sem redesenhar, senão o campo perde o foco a cada tecla.
+  $('listaCat').addEventListener('input', function(e){
+    var el = e.target, ci = el.dataset.c;
+    if(ci === undefined) return;
+    var cats = catalogo(), c = cats[ci];
+    if(!c) return;
+    if(el.dataset.p !== undefined){
+      var p = c.produtos[el.dataset.p];
+      if(!p) return;
+      if(el.dataset.v !== undefined) p.vars[el.dataset.v][el.dataset.f] = el.value;
+      else p[el.dataset.f] = el.value;
+      var lab = $('pl-' + ci + '-' + el.dataset.p);
+      if(lab) lab.textContent = precoDe(p).txt;
+    } else {
+      c[el.dataset.f] = el.value;
+    }
+    setCatalogo(cats, false);
+  });
+
+  $('listaCat').addEventListener('change', function(e){
+    var el = e.target;
+    if(el.tagName !== 'SELECT') return;
+    var cats = catalogo(), c = cats[el.dataset.c];
+    if(!c) return;
+    if(el.dataset.p !== undefined) c.produtos[el.dataset.p][el.dataset.f] = el.value;
+    else c[el.dataset.f] = el.value;
+    setCatalogo(cats);
+  });
+
+  // Formata o preço ao sair do campo.
+  $('listaCat').addEventListener('focusout', function(e){
+    var el = e.target;
+    if(el.dataset.f !== 'p' || !el.value.trim()) return;
+    el.value = num(parseNum(el.value), 2);
+    var cats = catalogo();
+    cats[el.dataset.c].produtos[el.dataset.p].vars[el.dataset.v].p = el.value;
+    setCatalogo(cats, false);
+  });
+
+  var alvoImagem = null;
+  $('listaCat').addEventListener('click', function(e){
+    var el = e.target.closest('[data-capa],[data-foto],[data-addprod],[data-rmcat],[data-rmprod],[data-addvar],[data-rmvar],[data-sobe],[data-desce]');
+    if(!el) return;
+    var d = el.dataset, cats = catalogo(), ix;
+
+    if(d.capa !== undefined || d.foto !== undefined){
+      var alvo = d.capa !== undefined ? d.capa : d.foto;
+      var parts = String(alvo).split('.');
+      var cat = cats[parts[0]];
+      alvoImagem = d.capa !== undefined
+        ? {chave:'c:' + cat.id, dim:1400}
+        : {chave:'p:' + cat.produtos[parts[1]].id, dim:900};
+      $('fileCat').click();
+      return;
+    }
+    if(d.addprod !== undefined){
+      cats[d.addprod].produtos = cats[d.addprod].produtos || [];
+      cats[d.addprod].produtos.push({id:novoId('p'), nome:'', desc:'', modo:'apartir', vars:[{t:'15 cm', p:''}]});
+    }
+    if(d.rmcat !== undefined){
+      var c = cats[d.rmcat];
+      imgSalva('c:' + c.id, '');
+      (c.produtos||[]).forEach(function(p){ imgSalva('p:' + p.id, ''); });
+      cats.splice(d.rmcat, 1);
+    }
+    if(d.rmprod !== undefined){
+      ix = d.rmprod.split('.');
+      imgSalva('p:' + cats[ix[0]].produtos[ix[1]].id, '');
+      cats[ix[0]].produtos.splice(ix[1], 1);
+    }
+    if(d.addvar !== undefined){
+      ix = d.addvar.split('.');
+      var pr = cats[ix[0]].produtos[ix[1]];
+      pr.vars = pr.vars || [];
+      pr.vars.push({t:'', p:''});
+    }
+    if(d.rmvar !== undefined){
+      ix = d.rmvar.split('.');
+      cats[ix[0]].produtos[ix[1]].vars.splice(ix[2], 1);
+    }
+    if(d.sobe !== undefined){ ix = +d.sobe; if(ix > 0) cats.splice(ix-1, 0, cats.splice(ix,1)[0]); }
+    if(d.desce !== undefined){ ix = +d.desce; if(ix < cats.length-1) cats.splice(ix+1, 0, cats.splice(ix,1)[0]); }
+    setCatalogo(cats);
+  });
+
+  $('fileCat').addEventListener('change', function(e){
+    var f = e.target.files[0]; e.target.value = '';
+    if(!f || !alvoImagem) return;
+    var a = alvoImagem; alvoImagem = null;
+    processaImagem(f, a.dim, false, function(dado){
+      if(!dado) return;
+      imgSalva(a.chave, dado).then(renderCatalogo);
+    });
+  });
+
+  $('btnNovaCat').addEventListener('click', function(){
+    var cats = catalogo();
+    cats.push({id:novoId('c'), nome:'', orient:'h', produtos:[]});
+    setCatalogo(cats);
+    var campos = $('listaCat').querySelectorAll('.cat-nome');
+    if(campos.length) campos[campos.length-1].focus();
+  });
+
+  /* ---------- catálogo em PDF ---------- */
+  $('btnCatPDF').addEventListener('click', function(){
+    var cats = catalogo().filter(function(c){ return (c.produtos||[]).length; });
+    if(!cats.length){
+      var b = $('btnCatPDF'); b.textContent = 'Cadastre ao menos um produto';
+      setTimeout(function(){ b.textContent = 'Gerar catálogo em PDF'; }, 2400);
+      return;
+    }
+    var marca = texto('orcMarca') || 'Impressão 3D';
+    var hoje = new Date();
+    var contato = [texto('orcFone'), texto('orcContato'), texto('orcDoc')].filter(Boolean);
+    var logo = imgs.logo;
+
+    var html = '<div class="cpg capa">' +
+      (logo ? '<img class="logo" src="'+logo+'" alt="">' : '') +
+      '<div class="marca">' + escapa(marca) + '</div>' +
+      '<div class="tit">CATÁLOGO</div>' +
+      '<div class="rule"></div>' +
+      '<div class="sub">' + escapa(texto('orcDescricao') || 'Peças impressas em 3D sob encomenda. Preços sujeitos a alteração; consulte disponibilidade de cores e tamanhos.') + '</div>' +
+      '<div class="ct">' + contato.map(escapa).join('<br>') + '</div>' +
+      '<div class="ct" style="margin-top:8mm">' + hoje.toLocaleDateString('pt-BR') + '</div>' +
+    '</div>';
+
+    cats.forEach(function(c){
+      var capa = img('c:' + c.id);
+      var vert = c.orient === 'v';
+      var cabec = '<div class="cat-cap ' + (vert ? 'v' : 'h') + '">' +
+        (capa ? '<img src="'+capa+'" alt="">' : '') +
+        '<div class="tit"><div class="nome">' + escapa(c.nome || 'Categoria') + '</div>' +
+        '<div class="cnt">' + c.produtos.length + ' modelo' + (c.produtos.length === 1 ? '' : 's') + '</div></div></div>' +
+        '<div class="cat-rule"></div>';
+
+      var prods = c.produtos.map(function(p){
+        var foto = img('p:' + p.id);
+        var pr = precoDe(p);
+        var tams = (p.vars||[]).filter(function(v){ return v.t || parseNum(v.p) > 0; });
+        var lista = p.modo === 'consulta' ? '' : tams.map(function(v){
+          var vp = parseNum(v.p);
+          return escapa(v.t || 'Tamanho único') + (vp > 0 ? ' — ' + money(vp) : '');
+        }).join('<br>');
+        return '<article class="prod">' +
+          (foto ? '<img src="'+foto+'" alt="">' : '') +
+          '<div><div class="nm">' + escapa(p.nome || 'Produto') + '</div>' +
+          (p.desc ? '<div class="ds">' + escapa(p.desc) + '</div>' : '') +
+          (lista ? '<div class="tam">' + lista + '</div>' : '') +
+          '<div class="pr">' + pr.txt + '</div></div></article>';
+      }).join('');
+
+      html += '<div class="cpg">' + cabec + '<div class="prods">' + prods + '</div>' +
+        '<div class="rodape"><span>' + escapa(marca) + ' · ' + escapa(c.nome || 'Categoria') + '</span>' +
+        '<span>' + contato.slice(0,2).map(escapa).join('  ·  ') + '</span></div></div>';
+    });
+
+    html += '<div class="cpg"><div class="cat-cap h"><div class="tit">' +
+      '<div class="nome">Como encomendar</div>' +
+      '<div class="cnt">condições gerais</div></div></div><div class="cat-rule"></div>' +
+      '<div class="cond">' +
+        '<div><div class="sh-h">Prazo de entrega</div><div class="v">' + num(val('orcPrazo'),0) + ' dias úteis</div></div>' +
+        '<div><div class="sh-h">Pagamento</div><div class="v">' + escapa(texto('orcPagamento') || 'A combinar') + '</div></div>' +
+        '<div><div class="sh-h">Validade dos preços</div><div class="v">' + num(val('orcValidade'),0) + ' dias</div></div>' +
+      '</div>' +
+      (texto('orcObs') ? '<div class="sh-obs" style="margin-top:8mm">' + escapa(texto('orcObs')) + '</div>' : '') +
+      '<div class="rodape"><span>' + escapa(marca) + '</span><span>' + contato.map(escapa).join('  ·  ') + '</span></div></div>';
+
+    $('catalogoPrint').innerHTML = html;
+
+    var titulo = document.title;
+    document.title = 'Catalogo-' + marca.replace(/[^\wÀ-ÿ]+/g,'-').replace(/^-|-$/g,'');
+    document.body.dataset.imprimir = 'catalogo';
+    window.print();
+    setTimeout(function(){ document.title = titulo; delete document.body.dataset.imprimir; }, 700);
+  });
+
   /* ---------- abas ---------- */
   function trocaAba(qual){
-    var gestao = qual === 'gestao';
-    $('viewCalc').hidden = gestao;
-    $('viewGestao').hidden = !gestao;
-    $('tabCalc').classList.toggle('on', !gestao);
-    $('tabGestao').classList.toggle('on', gestao);
-    if(gestao) renderGestao();
+    ['calc','gestao','catalogo'].forEach(function(v){
+      var nome = v.charAt(0).toUpperCase() + v.slice(1);
+      $('view' + nome).hidden = (v !== qual);
+      $('tab' + nome).classList.toggle('on', v === qual);
+    });
+    if(qual === 'gestao') renderGestao();
+    if(qual === 'catalogo') renderCatalogo();
     store('p3d.aba', qual);
   }
-  $('tabCalc').addEventListener('click', function(){ trocaAba('calc'); });
-  $('tabGestao').addEventListener('click', function(){ trocaAba('gestao'); });
+  ['calc','gestao','catalogo'].forEach(function(v){
+    $('tab' + v.charAt(0).toUpperCase() + v.slice(1)).addEventListener('click', function(){ trocaAba(v); });
+  });
 
   /* ---------- ações ---------- */
   $('btnCopy').addEventListener('click', function(){
@@ -1715,7 +2118,10 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
   });
 
   $('btnExport').addEventListener('click', function(){
-    var blob = new Blob([JSON.stringify({estado:estado(), lib:lib(), imgs:imgs, pedidos:pedidos()}, null, 2)], {type:'application/json'});
+    var blob = new Blob([JSON.stringify({
+      estado:estado(), lib:lib(), imgs:imgs, pedidos:pedidos(),
+      catalogo:catalogo(), catImgs:imgCache
+    }, null, 2)], {type:'application/json'});
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url; a.download = 'precifica-3d.json'; a.click();
@@ -1731,6 +2137,10 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
         var o = JSON.parse(fr.result);
         if(o.lib) setLib(o.lib);
         if(o.pedidos) setPedidos(o.pedidos);
+        if(o.catImgs){
+          Object.keys(o.catImgs).forEach(function(k){ imgSalva(k, o.catImgs[k]); });
+        }
+        if(o.catalogo) setCatalogo(o.catalogo);
         if(o.imgs){
           if(o.imgs.logo !== undefined) guardaImagem('logo', o.imgs.logo, $('btnLogo'), 'Trocar');
           if(o.imgs.foto !== undefined) guardaImagem('foto', o.imgs.foto, $('btnFoto'), 'Trocar');
@@ -1782,6 +2192,8 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
   renderLib();
   render();
   renderGestao();
-  trocaAba(load('p3d.aba') === 'gestao' ? 'gestao' : 'calc');
+  var aba = load('p3d.aba');
+  trocaAba(['gestao','catalogo'].indexOf(aba) > -1 ? aba : 'calc');
+  imgCarregaTudo().then(renderCatalogo);
 })();
 </script>

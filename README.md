@@ -63,6 +63,14 @@ Indicadores do mês:
 
 Mais: gráfico de receita dos últimos 6 meses, composição da receita do mês, pipeline em aberto, e a divisão do lucro entre reserva para refazer peça, reinvestimento e o que sobra para você — tudo em percentuais que você define.
 
+## Catálogo
+
+Terceira aba. Categorias livres (Anime, Games, Marvel, DC, Carros…), cada uma com capa horizontal ou vertical e quantos produtos você quiser. Cada produto tem foto, descrição e uma lista de tamanhos com preço próprio — 15 cm, 20 cm, 25 cm, 30 cm — e três modos de exibição: **a partir de** (mostra o menor preço), **preço único** ou **sob consulta**.
+
+O botão gera um PDF de várias páginas: capa com sua logo, uma página por categoria com os produtos em grade de duas colunas, e uma página final de condições.
+
+As imagens do catálogo ficam em **IndexedDB**, não no `localStorage` — dezenas de fotos passam muito dos ~5 MB que o `localStorage` oferece. Textos e preços continuam no `localStorage`. O backup JSON leva as duas coisas.
+
 ## O orçamento em PDF
 
 Não usa biblioteca de PDF: a página monta uma folha A4 real e chama a impressão do navegador, onde o destino "Salvar como PDF" gera o arquivo. O texto sai vetorial e selecionável, e o nome do arquivo já vem sugerido como `Orcamento-0001-Nome-do-Cliente.pdf`.
