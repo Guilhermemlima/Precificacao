@@ -3356,7 +3356,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   function setTumulos(t){ store('p3d.tumulos', JSON.stringify(t)); }
   var marcaAgua = function(){ return load('p3d.marcaAgua') || '1970-01-01T00:00:00Z'; };
 
-  var sincronizando = false, agendado = null, ultimoErro = null;
+  var sincronizando = false, agendado = null, ultimoErro = null, recado = '';
 
   function agendaSync(){
     if(!prontoParaSync()) return;
@@ -3393,6 +3393,29 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     if(mudou){ setCarimbos(c); setTumulos(t); agendaSync(); }
   }
 
+  /* --- mensagens de erro em português, com o que fazer --- */
+  function traduzErro(msg, corpo){
+    var m = String(msg || '').toLowerCase();
+    var cod = (corpo && (corpo.error_code || corpo.code)) || '';
+    if(m.indexOf('email not confirmed') > -1 || cod === 'email_not_confirmed')
+      return 'E-mail ainda não confirmado. Abra o link que o Supabase enviou para você, ou desligue a confirmação em Authentication → Sign In / Providers → Email.';
+    if(m.indexOf('invalid login credentials') > -1)
+      return 'E-mail ou senha não conferem. Se você acabou de criar a conta, o mais provável é que falte confirmar o e-mail: procure a mensagem do Supabase na caixa de entrada e no spam.';
+    if(m.indexOf('user already registered') > -1 || cod === 'user_already_exists')
+      return 'Esta conta já existe. Use "Entrar" em vez de "Criar conta".';
+    if(m.indexOf('password should be at least') > -1 || cod === 'weak_password')
+      return 'Senha curta demais. O Supabase exige pelo menos 6 caracteres.';
+    if(m.indexOf('for security purposes') > -1 || m.indexOf('rate limit') > -1 || cod === 'over_email_send_rate_limit')
+      return 'Muitas tentativas seguidas. Espere um minuto e tente de novo.';
+    if(m.indexOf('failed to fetch') > -1 || m.indexOf('networkerror') > -1)
+      return 'Não consegui falar com o Supabase. Confira a URL do projeto e sua internet.';
+    if(m.indexOf('relation') > -1 && m.indexOf('does not exist') > -1)
+      return 'A tabela não existe no banco. Rode o arquivo supabase-schema.sql no SQL Editor do projeto.';
+    if(m.indexOf('invalid api key') > -1 || m.indexOf('no api key') > -1)
+      return 'Chave anon inválida. Copie de novo em Project Settings → API.';
+    return msg;
+  }
+
   /* --- chamadas HTTP --- */
   function api(caminho, opcoes, comToken){
     var c = cfgNuvem();
@@ -3407,8 +3430,8 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
         var corpo = null;
         try{ corpo = txt ? JSON.parse(txt) : null; }catch(e){ corpo = txt; }
         if(!r.ok){
-          var msg = (corpo && (corpo.error_description || corpo.msg || corpo.message || corpo.error)) || ('erro ' + r.status);
-          var err = new Error(msg); err.status = r.status; throw err;
+          var bruto = (corpo && (corpo.error_description || corpo.msg || corpo.message || corpo.error)) || ('erro ' + r.status);
+          var err = new Error(traduzErro(bruto, corpo)); err.status = r.status; err.bruto = bruto; throw err;
         }
         return corpo;
       });
@@ -3612,7 +3635,8 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     if(q) linhas.push('<div class="l">Última sincronização: <b>' + new Date(q).toLocaleString('pt-BR') + '</b>.</div>');
     var pend = prontoParaSync() ? locaisParaEnviar().length : 0;
     if(pend) linhas.push('<div class="l">' + pend + ' alteração(ões) esperando para subir.</div>');
-    if(ultimoErro) linhas.push('<div class="l"><span class="er">✗</span> ' + escapa(ultimoErro) + '</div>');
+    if(ultimoErro) linhas.push('<div class="l" style="align-items:flex-start"><span class="er">✗</span> <span>' + escapa(ultimoErro) + '</span></div>');
+    if(recado) linhas.push('<div class="note" style="margin-top:8px">' + recado + '</div>');
     if(navigator.onLine === false) linhas.push('<div class="l">Sem internet agora — sobe assim que voltar.</div>');
 
     el.innerHTML = linhas.join('');
@@ -3650,12 +3674,20 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   $('nvEntrar').addEventListener('click', function(){
     salvaCfgDaTela();
     comBotao(this, 'Entrando…', entrar($('nvEmail').value.trim(), $('nvSenha').value)
-      .then(function(){ $('nvSenha').value = ''; return sincronizar(); }));
+      .then(function(){ $('nvSenha').value = ''; recado = ''; ultimoErro = null; return sincronizar(); }));
   });
   $('nvCriar').addEventListener('click', function(){
     salvaCfgDaTela();
     comBotao(this, 'Criando…', criarConta($('nvEmail').value.trim(), $('nvSenha').value)
-      .then(function(){ $('nvSenha').value = ''; return sessao() ? enviarTudo() : null; }));
+      .then(function(){
+        $('nvSenha').value = '';
+        if(sessao()) { recado = ''; return enviarTudo(); }
+        // Sem sessão na volta significa que o projeto exige confirmar o e-mail.
+        recado = 'Conta criada, mas ela só funciona depois de confirmada. Abra o link que o Supabase mandou para <b>' +
+                 escapa($('nvEmail').value.trim()) + '</b> (veja também o spam) e volte aqui para entrar. ' +
+                 'Se preferir não usar confirmação, desligue em Authentication → Sign In / Providers → Email → Confirm email.';
+        return null;
+      }));
   });
   $('nvSair').addEventListener('click', function(){
     setSessao(null);
