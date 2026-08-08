@@ -2677,9 +2677,12 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
   $('nCores').addEventListener('change', analisaFoto);
   $('ignoraFundo').addEventListener('change', analisaFoto);
 
-  /* ---------- abas ---------- */
+  /* ---------- abas ----------
+     Lista única: quem adicionar aba nova mexe só aqui. */
+  var ABAS = ['calc','gestao','catalogo','estoque'];
   function trocaAba(qual){
-    ['calc','gestao','catalogo','estoque'].forEach(function(v){
+    if(ABAS.indexOf(qual) < 0) qual = 'calc';
+    ABAS.forEach(function(v){
       var nome = v.charAt(0).toUpperCase() + v.slice(1);
       $('view' + nome).hidden = (v !== qual);
       $('tab' + nome).classList.toggle('on', v === qual);
@@ -2689,7 +2692,7 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
     if(qual === 'estoque'){ renderEstoque(); mostraAnalise(); }
     store('p3d.aba', qual);
   }
-  ['calc','gestao','catalogo'].forEach(function(v){
+  ABAS.forEach(function(v){
     $('tab' + v.charAt(0).toUpperCase() + v.slice(1)).addEventListener('click', function(){ trocaAba(v); });
   });
 
@@ -2791,8 +2794,7 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
   var minEst = load('p3d.estoqueMin');
   if(minEst) $('estoqueMin').value = minEst;
   renderEstoque();
-  var aba = load('p3d.aba');
-  trocaAba(['gestao','catalogo','estoque'].indexOf(aba) > -1 ? aba : 'calc');
+  trocaAba(load('p3d.aba') || 'calc');
   imgCarregaTudo().then(renderCatalogo);
 })();
 </script>
