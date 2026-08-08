@@ -3739,6 +3739,46 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     $('btnInstalar').textContent = 'Instalar no iPhone';
   }
 
+  /* Diagnóstico de instalação: abra a página com #diag no fim do endereço.
+     Serve para descobrir por que o navegador não oferece instalar. */
+  function diagnostico(){
+    var l = [];
+    l.push(['Abriu como app', jaInstalado ? 'SIM — já está instalado' : 'não (está no navegador)']);
+    l.push(['Endereço seguro', location.protocol === 'https:' ? 'sim' : 'NÃO — ' + location.protocol]);
+    l.push(['Convite de instalar', promptInstalar ? 'recebido' : 'NÃO recebido']);
+    l.push(['Aparelho', iOS ? 'iPhone/iPad' : (/android/i.test(navigator.userAgent) ? 'Android' : 'computador')]);
+    l.push(['Navegador', /samsungbrowser/i.test(navigator.userAgent) ? 'Samsung Internet'
+            : /edg/i.test(navigator.userAgent) ? 'Edge'
+            : /firefox/i.test(navigator.userAgent) ? 'Firefox'
+            : /chrome/i.test(navigator.userAgent) ? 'Chrome' : 'outro']);
+    l.push(['Versão da página', document.querySelector('#tabAvisos') ? 'atual' : 'ANTIGA — limpe o cache']);
+
+    var caixa = document.createElement('div');
+    caixa.style.cssText = 'position:fixed;inset:auto 10px 10px 10px;z-index:999;background:var(--surface);' +
+      'border:2px solid var(--accent);border-radius:12px;padding:14px 16px;font-size:13px;line-height:1.7;' +
+      'box-shadow:0 20px 50px -20px rgba(0,0,0,.6);max-height:70vh;overflow:auto';
+    caixa.innerHTML = '<b style="font-size:15px">Diagnóstico da instalação</b><br>' +
+      l.map(function(x){ return x[0] + ': <b>' + x[1] + '</b>'; }).join('<br>') +
+      '<div id="diagSw">Service worker: verificando…</div>' +
+      '<div id="diagMan">Manifesto: verificando…</div>' +
+      '<div style="margin-top:10px"><button class="btn tiny" id="diagFechar" type="button">Fechar</button></div>';
+    document.body.appendChild(caixa);
+    caixa.querySelector('#diagFechar').addEventListener('click', function(){ caixa.remove(); });
+
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.getRegistrations().then(function(r){
+        $('diagSw').innerHTML = 'Service worker: <b>' +
+          (r.length ? (r[0].active ? 'ativo' : 'instalando') : 'NENHUM') + '</b>';
+      });
+    } else $('diagSw').innerHTML = 'Service worker: <b>não suportado</b>';
+
+    fetch('manifest.webmanifest').then(function(r){
+      $('diagMan').innerHTML = 'Manifesto: <b>' + (r.ok ? 'ok' : 'ERRO ' + r.status) + '</b>';
+    }).catch(function(){ $('diagMan').innerHTML = 'Manifesto: <b>não carregou</b>'; });
+  }
+  if(location.hash === '#diag' || location.search.indexOf('diag') > -1) setTimeout(diagnostico, 1200);
+  window.addEventListener('hashchange', function(){ if(location.hash === '#diag') diagnostico(); });
+
   $('btnInstalar').addEventListener('click', function(){
     var b = this;
     if(promptInstalar){
