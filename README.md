@@ -73,11 +73,17 @@ Sobe uma foto do personagem e a página diz quantos filamentos a peça exige, qu
 
 **Como funciona, sem enfeite:** é quantização de cor por k-means no espaço **OKLab**, rodando no navegador — nenhuma imagem sai do computador. Não é reconhecimento de objeto: o programa lê as cores que dominam a imagem, não entende que "aquilo é o cabelo do personagem".
 
-- O fundo é estimado pelos quatro cantos da foto e descartado (desativável).
-- Grupos abaixo de 2% dos pixels são descartados e, no modo automático, cores perceptualmente equivalentes (ΔE < 12) são fundidas — senão bordas serrilhadas viram filamentos fantasma.
-- Cada cor é comparada ao estoque por distância perceptual: ΔE ≤ 10 conta como "tem", até 22 como "só parecida".
+- **Claridade pesa menos que matiz** (0,42) ao agrupar: sombra e brilho são iluminação, não pigmento, e sem isso uma peça vermelha vira três filamentos.
+- **Fundo** modelado a partir de uma faixa de toda a borda, agrupada em até 3 tons — pega fundo com degradê ou textura, não só liso (desativável).
+- Brilho estourado (L > 0,95) e sombra esmagada (L < 0,07) são descartados antes de agrupar.
+- Sementes determinísticas por ponto-mais-distante no percentil 95: mesma foto, mesmo resultado, sem eleger pixel solto como cor.
+- A cor de cada grupo é a **média aparada** do miolo de claridade (percentis 25–75); a média simples fica lavada pelas sombras.
+- Grupos abaixo de 3% são descartados e, no automático, cores perceptualmente equivalentes são fundidas — inclusive cinzas de claridade próxima.
+- Comparação com o estoque usa distância perceptual cheia: ΔE ≤ 10 é "tem", até 22 é "só parecida".
 - As gramas por cor saem do peso da peça na calculadora, rateado pela fatia de pixels.
 - Acima de 4 cores, avisa que o ACE trabalha com 4 por vez.
+
+Quando o automático erra, dá para corrigir: **clicar na foto** fixa aquela cor como filamento (conta-gotas) e o **×** descarta uma cor que era sombra. Os percentuais são recalculados reatribuindo todos os pixels à paleta corrigida.
 
 Um botão desconta do estoque as gramas estimadas de cada cor.
 

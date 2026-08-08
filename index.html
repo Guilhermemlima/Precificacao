@@ -297,6 +297,7 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
   padding:12px 14px; border-radius:9px; background:var(--accent-soft); border:1px solid var(--accent);
   font-size:13.5px; line-height:1.55; margin-top:14px;
 }
+#boxAnalise img{max-height:240px; cursor:crosshair}
 
 /* ---------- editor de catálogo ---------- */
 .cat{background:var(--surface); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); margin-bottom:14px}
@@ -307,7 +308,7 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
   font-size:10.5px; color:var(--muted); text-align:center; padding:4px; cursor:pointer;
 }
 .cat-capa.v{width:64px; height:88px}
-.cat-capa img{width:100%; height:100%; object-fit:cover; display:block}
+.cat-capa img{width:100%; height:100%; object-fit:contain; display:block}
 .cat-meta{flex:1; min-width:200px; display:flex; flex-direction:column; gap:7px}
 .cat-meta .l1{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
 .cat-nome{
@@ -324,7 +325,7 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
   background:var(--surface); display:flex; align-items:center; justify-content:center; overflow:hidden;
   font-size:10px; color:var(--muted); text-align:center; padding:4px; cursor:pointer;
 }
-.prod-foto img{width:100%; height:100%; object-fit:cover; display:block}
+.prod-foto img{width:100%; height:100%; object-fit:contain; display:block}
 .prod-campos{flex:1; min-width:230px; display:flex; flex-direction:column; gap:7px}
 .prod-campos input[type=text], .prod-campos select{
   background:var(--surface); border:1px solid var(--line-strong); border-radius:7px; color:var(--ink);
@@ -363,15 +364,17 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
 /* página de categoria */
 .cat-cap{display:flex; gap:8mm; align-items:flex-end; margin-bottom:7mm}
 .cat-cap.h{flex-direction:column; align-items:stretch; gap:4mm}
-.cat-cap.h img{width:100%; height:52mm; object-fit:cover; border-radius:2mm; display:block}
-.cat-cap.v img{width:52mm; height:72mm; object-fit:cover; border-radius:2mm; flex:none; display:block}
+/* Sem recorte e sem tarja: a caixa acompanha a proporção da foto, seja ela
+   deitada ou em pé, respeitando apenas os limites da página. */
+.cat-cap.h img{width:auto; height:auto; max-width:100%; max-height:82mm; border-radius:2mm; display:block; margin:0 auto}
+.cat-cap.v img{width:auto; height:auto; max-width:52mm; max-height:108mm; border-radius:2mm; flex:none; display:block}
 .cat-cap .tit{flex:1; min-width:0}
 .cat-cap .nome{font-family:var(--font-display); font-size:26pt; font-weight:600; letter-spacing:.03em; line-height:1.05}
 .cat-cap .cnt{font-family:var(--font-display); font-size:8.5pt; letter-spacing:.16em; text-transform:uppercase; color:#6b7481; margin-top:2mm}
 .cat-rule{height:2pt; background:#c8480a; border-radius:1pt; margin-bottom:6mm}
 .prods{display:grid; grid-template-columns:1fr 1fr; gap:6mm}
 .prod{display:flex; gap:4mm; break-inside:avoid; page-break-inside:avoid}
-.prod img{width:30mm; height:30mm; object-fit:cover; border-radius:1.5mm; flex:none; border:.75pt solid #e4e8ec}
+.prod img{width:auto; height:auto; max-width:30mm; max-height:40mm; border-radius:1.5mm; flex:none; border:.75pt solid #e4e8ec; align-self:flex-start}
 .prod .nm{font-size:11pt; font-weight:600; line-height:1.2}
 .prod .ds{font-size:8.5pt; color:#6b7481; line-height:1.4; margin-top:1mm}
 .prod .tam{font-family:var(--font-mono); font-size:8.5pt; color:#4a5560; line-height:1.6; margin-top:1.5mm}
@@ -2427,104 +2430,152 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
 
   /* ---------- análise de cores da foto ----------
      Quantização k-means em OKLab, tudo no navegador. Não reconhece o
-     personagem: lê as cores que dominam a imagem e compara com o estoque. */
-  var ultimaAnalise = null;
+     personagem: lê as cores que dominam a imagem e compara com o estoque.
 
-  function amostraPixels(img, ignorarFundo){
-    var lado = 150;
-    var esc = Math.min(1, lado/Math.max(img.width, img.height));
+     O que a primeira versão errava em foto de verdade:
+     - sombra e brilho quebravam uma cor só em vários grupos;
+     - o fundo era estimado por 4 pixels de canto, o que não pega fundo
+       com textura ou degradê;
+     - a cor de cada grupo saía da média, que fica lavada pelas sombras.  */
+  var amostraAtual = null, paletaAtual = null, cvAmostra = null;
+
+  // Na escolha do filamento o que importa é o pigmento, não a iluminação:
+  // a claridade pesa menos que matiz e saturação.
+  var PESO_L = 0.42;
+  function dW(a, b){
+    var dl = (a[0]-b[0])*100*PESO_L, da = (a[1]-b[1])*100, db = (a[2]-b[2])*100;
+    return Math.sqrt(dl*dl + da*da + db*db);
+  }
+  function croma(lab){ return Math.sqrt(lab[1]*lab[1] + lab[2]*lab[2]); }
+
+  function amostraPixels(im, ignorarFundo){
+    var lado = 200;
+    var esc = Math.min(1, lado/Math.max(im.width, im.height));
     var cv = document.createElement('canvas');
-    cv.width = Math.max(1, Math.round(img.width*esc));
-    cv.height = Math.max(1, Math.round(img.height*esc));
+    cv.width = Math.max(1, Math.round(im.width*esc));
+    cv.height = Math.max(1, Math.round(im.height*esc));
     var ctx = cv.getContext('2d', {willReadFrequently:true});
-    ctx.drawImage(img, 0, 0, cv.width, cv.height);
-    var d = ctx.getImageData(0, 0, cv.width, cv.height).data;
-    var W = cv.width, H = cv.height;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(im, 0, 0, cv.width, cv.height);
+    cvAmostra = cv;
+    var d = ctx.getImageData(0, 0, cv.width, cv.height).data, W = cv.width, H = cv.height;
+    var lab = function(k){ return srgbOklab(d[k], d[k+1], d[k+2]); };
 
-    // O fundo é estimado pelos quatro cantos da foto.
-    var cantos = [];
+    // Fundo: modelo tirado de uma faixa da borda inteira, não de 4 pixels.
+    // Uma borda com degradê ou textura vira 3 tons representativos.
+    var fundos = [];
     if(ignorarFundo){
-      [[2,2],[W-3,2],[2,H-3],[W-3,H-3]].forEach(function(p){
-        var k = (p[1]*W + p[0])*4;
-        cantos.push(srgbOklab(d[k], d[k+1], d[k+2]));
-      });
-    }
-
-    var pts = [], fundo = 0, total = 0;
-    for(var y = 0; y < H; y++){
+      var borda = [], m = Math.max(2, Math.round(Math.min(W,H)*0.04));
       for(var x = 0; x < W; x++){
-        var k = (y*W + x)*4;
-        if(d[k+3] < 128) continue;
-        total++;
-        var lab = srgbOklab(d[k], d[k+1], d[k+2]);
-        if(cantos.length && cantos.some(function(c){ return dE(lab, c) < 14; })){ fundo++; continue; }
-        pts.push(lab);
+        for(var y = 0; y < H; y++){
+          if(x < m || y < m || x >= W-m || y >= H-m) borda.push(lab((y*W+x)*4));
+        }
+      }
+      if(borda.length > 20){
+        var gb = kmeans(borda, 3);
+        gb.forEach(function(g){ if(g.n/borda.length > 0.12) fundos.push(g.lab); });
       }
     }
-    return {pts:pts, fundo:fundo, total:total};
+
+    var pts = [], fundo = 0, total = 0, luz = 0;
+    for(var i = 0; i < W*H; i++){
+      var k = i*4;
+      if(d[k+3] < 128) continue;
+      total++;
+      var c = lab(k);
+      // Brilho estourado e sombra esmagada são iluminação, não pigmento.
+      if(c[0] > 0.95 || c[0] < 0.07){ luz++; continue; }
+      if(fundos.length && fundos.some(function(f){ return dE(c, f) < 15; })){ fundo++; continue; }
+      pts.push(c);
+    }
+    return {pts:pts, fundo:fundo, luz:luz, total:total};
+  }
+
+  // Sementes determinísticas pelo método do ponto mais distante, tomando o
+  // percentil 95 em vez do máximo para não eleger um pixel solto a centro.
+  function sementes(pts, k){
+    var med = [0,0,0];
+    pts.forEach(function(p){ med[0]+=p[0]; med[1]+=p[1]; med[2]+=p[2]; });
+    med = med.map(function(v){ return v/pts.length; });
+    var pri = pts[0], dmax = -1;
+    pts.forEach(function(p){ var d = dW(p, med); if(d > dmax){ dmax = d; pri = p; } });
+    var C = [pri.slice()], dm = pts.map(function(p){ return dW(p, C[0]); });
+    while(C.length < k){
+      var ord = dm.slice().sort(function(a,b){ return a-b; });
+      var corte = ord[Math.floor(ord.length*0.95)];
+      var idx = 0;
+      for(var i = 0; i < dm.length; i++){ if(dm[i] >= corte){ idx = i; break; } }
+      C.push(pts[idx].slice());
+      for(var j = 0; j < dm.length; j++){
+        var d2 = dW(pts[j], C[C.length-1]);
+        if(d2 < dm[j]) dm[j] = d2;
+      }
+    }
+    return C;
   }
 
   function kmeans(pts, k){
     if(!pts.length) return [];
-    // Sementes espalhadas por luminosidade, para não cair todas no mesmo tom.
-    var ord = pts.slice().sort(function(a,b){ return a[0]-b[0]; });
-    var cent = [];
-    for(var i = 0; i < k; i++) cent.push(ord[Math.floor((i+0.5)/k * ord.length)].slice());
-
-    var atrib = new Array(pts.length);
-    for(var it = 0; it < 14; it++){
+    k = Math.min(k, pts.length);
+    var cent = sementes(pts, k), atrib = new Array(pts.length);
+    for(var it = 0; it < 25; it++){
       var mudou = false;
       for(var p = 0; p < pts.length; p++){
-        var melhor = 0, dm = Infinity;
+        var melhor = 0, dmin = Infinity;
         for(var c = 0; c < k; c++){
-          var dd = dE(pts[p], cent[c]);
-          if(dd < dm){ dm = dd; melhor = c; }
+          var dd = dW(pts[p], cent[c]);
+          if(dd < dmin){ dmin = dd; melhor = c; }
         }
         if(atrib[p] !== melhor){ atrib[p] = melhor; mudou = true; }
       }
       var som = [], cnt = [];
-      for(var c2 = 0; c2 < k; c2++){ som.push([0,0,0]); cnt.push(0); }
+      for(var a = 0; a < k; a++){ som.push([0,0,0]); cnt.push(0); }
       for(var q = 0; q < pts.length; q++){
         var g = atrib[q];
-        som[g][0] += pts[q][0]; som[g][1] += pts[q][1]; som[g][2] += pts[q][2];
-        cnt[g]++;
+        som[g][0]+=pts[q][0]; som[g][1]+=pts[q][1]; som[g][2]+=pts[q][2]; cnt[g]++;
       }
-      for(var c3 = 0; c3 < k; c3++){
-        if(cnt[c3]) cent[c3] = [som[c3][0]/cnt[c3], som[c3][1]/cnt[c3], som[c3][2]/cnt[c3]];
-      }
+      for(var b = 0; b < k; b++) if(cnt[b]) cent[b] = [som[b][0]/cnt[b], som[b][1]/cnt[b], som[b][2]/cnt[b]];
       if(!mudou) break;
     }
-
     var res = [], inercia = 0;
-    for(var c4 = 0; c4 < k; c4++) res.push({lab:cent[c4], n:0});
-    for(var w = 0; w < pts.length; w++){
-      res[atrib[w]].n++;
-      inercia += dE(pts[w], cent[atrib[w]]);
-    }
+    for(var e = 0; e < k; e++) res.push({lab:cent[e], n:0});
+    for(var w = 0; w < pts.length; w++){ res[atrib[w]].n++; inercia += dW(pts[w], cent[atrib[w]]); }
     res.inercia = inercia/pts.length;
     return res.filter(function(x){ return x.n > 0; }).sort(function(a,b){ return b.n-a.n; });
   }
 
-  // Bordas serrilhadas e sombras geram grupos fantasma. Descarta os residuais e,
-  // no modo automático, funde os que o olho não distinguiria como outro filamento.
+  // Cor representativa: média aparada do miolo de claridade do grupo. A média
+  // simples puxa para o cinza porque soma sombra e brilho da mesma peça.
+  function corRepresentativa(pts){
+    if(!pts.length) return [0,0,0];
+    var ord = pts.slice().sort(function(a,b){ return a[0]-b[0]; });
+    var ini = Math.floor(ord.length*0.25), fim = Math.max(ini+1, Math.floor(ord.length*0.75));
+    var m = [0,0,0], n = fim-ini;
+    for(var i = ini; i < fim; i++){ m[0]+=ord[i][0]; m[1]+=ord[i][1]; m[2]+=ord[i][2]; }
+    return [m[0]/n, m[1]/n, m[2]/n];
+  }
+
+  // Descarta grupos residuais e funde o que o olho leria como o mesmo filamento.
   function limpaGrupos(gr, total, fundir){
-    var vivos = gr.filter(function(g){ return g.n/total >= 0.02; });
+    var vivos = gr.filter(function(g){ return g.n/total >= 0.03; });
     if(!vivos.length) vivos = gr.slice(0, 1);
-    if(fundir){
-      var mudou = true;
-      while(mudou && vivos.length > 1){
-        mudou = false;
-        for(var i = 0; i < vivos.length && !mudou; i++){
-          for(var j = i+1; j < vivos.length; j++){
-            if(dE(vivos[i].lab, vivos[j].lab) < 12){
-              var n = vivos[i].n + vivos[j].n;
-              vivos[i] = {n:n, lab:[0,1,2].map(function(c){
-                return (vivos[i].lab[c]*vivos[i].n + vivos[j].lab[c]*vivos[j].n) / n;
-              })};
-              vivos.splice(j, 1);
-              mudou = true;
-              break;
-            }
+    if(!fundir) return vivos;
+    var mudou = true;
+    while(mudou && vivos.length > 1){
+      mudou = false;
+      for(var i = 0; i < vivos.length && !mudou; i++){
+        for(var j = i+1; j < vivos.length; j++){
+          var ci = croma(vivos[i].lab), cj = croma(vivos[j].lab);
+          // Dois cinzas de claridade próxima também são um filamento só.
+          var acinzentados = ci < 0.035 && cj < 0.035 && Math.abs(vivos[i].lab[0]-vivos[j].lab[0]) < 0.22;
+          if(dW(vivos[i].lab, vivos[j].lab) < 15 || acinzentados){
+            var n = vivos[i].n + vivos[j].n;
+            vivos[i] = {n:n, lab:[0,1,2].map(function(c){
+              return (vivos[i].lab[c]*vivos[i].n + vivos[j].lab[c]*vivos[j].n)/n;
+            })};
+            vivos.splice(j, 1);
+            mudou = true;
+            break;
           }
         }
       }
@@ -2532,41 +2583,66 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
     return vivos.sort(function(a,b){ return b.n-a.n; });
   }
 
-  // Sem k definido, procura o ponto onde separar mais uma cor deixa de compensar.
   function melhorK(pts){
     var ant = null, escolha = 1;
-    for(var k = 1; k <= 5; k++){
+    for(var k = 1; k <= 6; k++){
       var g = kmeans(pts, k);
-      if(ant !== null && (ant - g.inercia)/ant < 0.22) break;
+      if(ant !== null && (ant - g.inercia)/ant < 0.18) break;
       ant = g.inercia; escolha = k;
-      if(g.inercia < 4) break;
+      if(g.inercia < 3) break;
     }
     return escolha;
   }
 
+  // Reatribui todos os pixels à paleta atual. Roda de novo quando você
+  // adiciona uma cor com o conta-gotas ou remove uma que era sombra.
+  function recomputa(){
+    if(!amostraAtual || !paletaAtual || !paletaAtual.length){ mostraAnalise(); return; }
+    var pts = amostraAtual.pts, k = paletaAtual.length;
+    var baldes = [];
+    for(var i = 0; i < k; i++) baldes.push([]);
+    for(var p = 0; p < pts.length; p++){
+      var melhor = 0, dmin = Infinity;
+      for(var c = 0; c < k; c++){
+        var d = dW(pts[p], paletaAtual[c].lab);
+        if(d < dmin){ dmin = d; melhor = c; }
+      }
+      baldes[melhor].push(pts[p]);
+    }
+    paletaAtual.forEach(function(c, i){
+      c.n = baldes[i].length;
+      c.pct = pts.length ? c.n/pts.length : 0;
+      // Cor fixada pelo conta-gotas não é recalculada: é o que você apontou.
+      if(!c.fixa && baldes[i].length) c.lab = corRepresentativa(baldes[i]);
+      c.hex = oklabHex(c.lab);
+    });
+    mostraAnalise();
+  }
+
   function analisaFoto(){
     var el = $('prevAnalise');
-    if(!el.src || el.hidden) return;
+    if(!el.getAttribute('src') || el.hidden) return;
     var im = new Image();
     im.onload = function(){
       var am = amostraPixels(im, $('ignoraFundo').checked);
-      if(am.pts.length < 40){
-        $('saidaAnalise').innerHTML = '<p class="note">Sobraram pixels demais no fundo — quase nada da peça restou para analisar. Desmarque “ignorar o fundo” e tente de novo.</p>';
+      amostraAtual = am;
+      if(am.pts.length < 60){
+        paletaAtual = null;
+        $('saidaAnalise').innerHTML = '<p class="note">Sobrou quase nada da peça depois de tirar o fundo. Desmarque <b>“ignorar o fundo”</b> e analise de novo.</p>';
         $('subFundo').textContent = '';
         return;
       }
       var pedido = parseInt($('nCores').value, 10);
       var k = pedido || melhorK(am.pts);
       var grupos = limpaGrupos(kmeans(am.pts, k), am.pts.length, !pedido);
-      ultimaAnalise = grupos.map(function(g){
-        return {pct:g.n/am.pts.length, hex:oklabHex(g.lab), lab:g.lab};
-      });
-      $('subFundo').textContent = am.total
-        ? num(am.fundo/am.total*100, 0) + '% da foto foi tratada como fundo'
-        : '';
-      mostraAnalise();
+      paletaAtual = grupos.map(function(g){ return {lab:g.lab, fixa:false}; });
+      var partes = [];
+      if(am.fundo) partes.push(num(am.fundo/am.total*100,0) + '% descartado como fundo');
+      if(am.luz) partes.push(num(am.luz/am.total*100,0) + '% como brilho ou sombra');
+      $('subFundo').textContent = partes.join(' · ');
+      recomputa();
     };
-    im.src = el.src;
+    im.src = el.getAttribute('src');
   }
 
   // OKLab -> sRGB (inversa direta da conversão acima).
@@ -2583,7 +2659,8 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
   }
 
   function mostraAnalise(){
-    if(!ultimaAnalise){ $('saidaAnalise').innerHTML = ''; $('hintAnalise').textContent = ''; return; }
+    var ultimaAnalise = paletaAtual;
+    if(!ultimaAnalise || !ultimaAnalise.length){ $('saidaAnalise').innerHTML = ''; $('hintAnalise').textContent = ''; return; }
     var rolos = estoque().map(function(x){
       return {nome:x.nome || nomeCor.apply(null, hexRgb(x.hex)), hex:x.hex, g:parseNum(x.g),
               tipo:x.tipo, lab:srgbOklab.apply(null, hexRgb(x.hex))};
@@ -2591,7 +2668,7 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
     var gramasPeca = (val('gramasPeca') + val('gramasPurga')) / Math.max(1, val('pecasPorLote'));
     var faltando = 0, temTudo = 0;
 
-    var linhas = ultimaAnalise.map(function(c){
+    var linhas = ultimaAnalise.map(function(c, idx){
       var rgb = hexRgb(c.hex);
       var g = gramasPeca * c.pct;
       var perto = null, dist = Infinity;
@@ -2615,12 +2692,15 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
       return '<div class="cor-l">' +
         '<span class="cor-am" style="background:'+c.hex+'"></span>' +
         '<div class="cor-inf">' +
-          '<div class="t">' + nomeCor(rgb[0],rgb[1],rgb[2]) + ' <span style="font-family:var(--font-mono);font-weight:400;color:var(--muted);font-size:12px">'+c.hex+'</span></div>' +
+          '<div class="t">' + nomeCor(rgb[0],rgb[1],rgb[2]) +
+            ' <span style="font-family:var(--font-mono);font-weight:400;color:var(--muted);font-size:12px">'+c.hex+'</span>' +
+            (c.fixa ? ' <span class="sub" style="color:var(--accent)">fixada por você</span>' : '') + '</div>' +
           '<div class="s">' + num(c.pct*100,0) + '% da peça' +
             (gramasPeca > 0 ? ' · aproximadamente <b>' + num(g,0) + ' g</b>' : '') +
             ' &nbsp;·&nbsp; ' + det + '</div>' +
         '</div>' +
         '<span class="cor-st '+cls+'">' + st + '</span>' +
+        '<button class="btn tiny ghost" data-rmcor="'+idx+'" type="button" title="Não é um filamento — era sombra ou fundo">×</button>' +
       '</div>';
     }).join('');
 
@@ -2634,7 +2714,8 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
 
     $('saidaAnalise').innerHTML =
       '<div class="cores-lista">' + linhas + '</div>' +
-      '<div class="resumo-an">Esta peça sairia com <b>' + n + ' filamento' + (n===1?'':'s') + '</b>.' + falta + aviso + '</div>' +
+      '<div class="resumo-an">Esta peça sairia com <b>' + n + ' filamento' + (n===1?'':'s') + '</b>.' + falta + aviso +
+        '<br><span style="color:var(--ink-2)">Errou alguma? <b>Clique na foto</b> para fixar a cor certa, ou no <b>×</b> para descartar a que era sombra.</span></div>' +
       (temTudo && gramasPeca > 0
         ? '<button class="btn" type="button" id="btnBaixa" style="margin-top:12px">Dar baixa das gramas estimadas no estoque</button>'
         : '');
@@ -2658,6 +2739,46 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
       this.disabled = true;
     });
   }
+
+  // Descartar uma cor que era sombra ou resto de fundo.
+  $('saidaAnalise').addEventListener('click', function(e){
+    var b = e.target.closest('[data-rmcor]');
+    if(!b || !paletaAtual) return;
+    if(paletaAtual.length <= 1) return;
+    paletaAtual.splice(+b.dataset.rmcor, 1);
+    recomputa();
+  });
+
+  // Conta-gotas: clicar na foto fixa aquela cor como um filamento.
+  $('prevAnalise').addEventListener('click', function(e){
+    if(!cvAmostra || !paletaAtual) return;
+    var r = this.getBoundingClientRect();
+    var natW = this.naturalWidth, natH = this.naturalHeight;
+    if(!natW || !natH) return;
+    // A imagem usa object-fit:contain — o desenho não ocupa a caixa inteira.
+    var arImg = natW/natH, arCx = r.width/r.height, dw, dh;
+    if(arImg > arCx){ dw = r.width; dh = r.width/arImg; }
+    else { dh = r.height; dw = r.height*arImg; }
+    var u = (e.clientX - (r.left + (r.width-dw)/2)) / dw;
+    var v = (e.clientY - (r.top + (r.height-dh)/2)) / dh;
+    if(u < 0 || u > 1 || v < 0 || v > 1) return;
+
+    var cx = Math.min(cvAmostra.width-1, Math.max(0, Math.round(u*cvAmostra.width)));
+    var cy = Math.min(cvAmostra.height-1, Math.max(0, Math.round(v*cvAmostra.height)));
+    var ctx = cvAmostra.getContext('2d', {willReadFrequently:true});
+    var x0 = Math.max(0, cx-1), y0 = Math.max(0, cy-1);
+    var d = ctx.getImageData(x0, y0, Math.min(3, cvAmostra.width-x0), Math.min(3, cvAmostra.height-y0)).data;
+    var s = [0,0,0], n = 0;
+    for(var i = 0; i < d.length; i += 4){ s[0]+=d[i]; s[1]+=d[i+1]; s[2]+=d[i+2]; n++; }
+    var lab = srgbOklab(s[0]/n, s[1]/n, s[2]/n);
+
+    // Se já existe uma cor parecida, substitui por esta em vez de somar outra.
+    var perto = -1, dm = Infinity;
+    paletaAtual.forEach(function(c, i){ var dd = dW(lab, c.lab); if(dd < dm){ dm = dd; perto = i; } });
+    if(perto > -1 && dm < 15) paletaAtual[perto] = {lab:lab, fixa:true};
+    else paletaAtual.push({lab:lab, fixa:true});
+    recomputa();
+  });
 
   $('btnAnaliseFoto').addEventListener('click', function(){ $('fileAnalise').click(); });
   $('fileAnalise').addEventListener('change', function(e){
