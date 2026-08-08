@@ -10,6 +10,12 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon192.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon192.png">
+<script>
+/* O Chrome pode avisar que dá para instalar antes do script principal
+   existir. Guardamos o aviso aqui, no topo, para não perder a chance. */
+window.__instalar = null;
+addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); window.__instalar = e; });
+</script>
 <style>
 /* ---------- tokens ---------- */
 :root{
@@ -3711,9 +3717,11 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     });
   }
 
-  var promptInstalar = null;
   var iOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
   var jaInstalado = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  // Pode já ter sido capturado lá no topo da página, antes deste script.
+  var promptInstalar = window.__instalar || null;
+  if(promptInstalar && !jaInstalado) $('btnInstalar').hidden = false;
 
   window.addEventListener('beforeinstallprompt', function(e){
     e.preventDefault();
