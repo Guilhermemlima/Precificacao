@@ -3750,7 +3750,18 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       'box-shadow:0 20px 50px -20px rgba(0,0,0,.6);max-height:70vh;overflow:auto';
     document.body.appendChild(caixa);
 
-    var sw = 'verificando…', man = 'verificando…';
+    var sw = 'verificando…', man = 'verificando…', instal = 'verificando…';
+
+    // Pergunta ao Android se este app já está instalado. É a única resposta
+    // definitiva: o Chrome deixa de convidar quando já existe instalação.
+    if(navigator.getInstalledRelatedApps){
+      navigator.getInstalledRelatedApps().then(function(apps){
+        instal = apps && apps.length
+          ? 'JÁ ESTÁ INSTALADO — procure na gaveta de apps'
+          : 'não está instalado';
+        pinta();
+      }).catch(function(){ instal = 'não foi possível verificar'; pinta(); });
+    } else instal = 'este navegador não sabe informar';
     if('serviceWorker' in navigator){
       navigator.serviceWorker.getRegistrations().then(function(r){
         sw = r.length ? (r[0].active ? 'ativo' : 'instalando') : 'NENHUM'; pinta();
@@ -3763,7 +3774,8 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     // Por isso o quadro se atualiza sozinho, em vez de congelar o primeiro estado.
     function pinta(){
       var l = [
-        ['Abriu como app', jaInstalado ? 'SIM — já está instalado' : 'não (está no navegador)'],
+        ['Já instalado no aparelho', instal],
+        ['Esta janela é o app', jaInstalado ? 'sim' : 'não (está no navegador)'],
         ['Endereço seguro', location.protocol === 'https:' ? 'sim' : 'NÃO — ' + location.protocol],
         ['Convite de instalar', promptInstalar ? 'RECEBIDO — pode instalar agora' : 'ainda não chegou, aguarde'],
         ['Aparelho', iOS ? 'iPhone/iPad' : (/android/i.test(navigator.userAgent) ? 'Android' : 'computador')],
