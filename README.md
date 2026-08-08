@@ -93,6 +93,12 @@ Terceira aba. Categorias livres (Anime, Games, Marvel, DC, Carros…), cada uma 
 
 O botão gera um PDF de várias páginas: capa com sua logo, uma página por categoria com os produtos em grade de duas colunas, e uma página final de condições.
 
+### Descrição automática
+
+Cada produto tem um botão que escreve a descrição sozinho. **Não é IA e não enxerga o personagem:** o que ele sabe do produto vem do nome digitado e do nome da categoria; da foto sai só a paleta de cores, pelo mesmo motor da aba de estoque.
+
+O texto monta quatro partes — gancho, corpo técnico com as cores detectadas, linha de tamanhos e fecho — a partir de bancos de frases. O gancho muda conforme o tema da categoria (anime, games, heróis, carros, desenho, terror, decoração). A escolha vem de um hash do nome do produto, então cada peça recebe um texto diferente; apertar de novo gira para outra variação.
+
 Produtos se movem entre categorias e sobem/descem dentro delas. Duplicar oferece dois modos:
 
 - **Cópia independente** — vira outro produto, com preços e descrição próprios.

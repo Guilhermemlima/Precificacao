@@ -327,6 +327,7 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
 }
 .prod-foto img{width:100%; height:100%; object-fit:contain; display:block}
 .prod-campos{flex:1; min-width:230px; display:flex; flex-direction:column; gap:7px}
+.prod-campos textarea{font-size:13px; min-height:44px; line-height:1.45}
 .prod-campos input[type=text], .prod-campos select{
   background:var(--surface); border:1px solid var(--line-strong); border-radius:7px; color:var(--ink);
   padding:6px 9px; font-size:13.5px; font-family:var(--font-ui); width:100%;
@@ -1998,7 +1999,134 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
   $('btnNovoPedido').addEventListener('click', function(){ registraPedido(this, 'Registrar o cálculo atual'); });
   $('btnRegistrar').addEventListener('click', function(){ registraPedido(this, 'Registrar como pedido'); });
 
+  /* ---------- gerador de descrição ----------
+     Não é IA e não enxerga o personagem: o que ele sabe do produto vem do
+     nome que você digitou e da categoria. Da foto sai só a paleta de cores,
+     pelo mesmo motor da aba de estoque. O resto é redação com variações. */
+
+  function coresDaImagem(dataURI, cb){
+    if(!dataURI) return cb([]);
+    var im = new Image();
+    im.onerror = function(){ cb([]); };
+    im.onload = function(){
+      var guarda = cvAmostra;
+      var am = amostraPixels(im, true);
+      cvAmostra = guarda;
+      if(am.pts.length < 60) return cb([]);
+      var grupos = limpaGrupos(kmeans(am.pts, melhorK(am.pts)), am.pts.length, true);
+      var baldes = grupos.map(function(){ return []; });
+      am.pts.forEach(function(p){
+        var b = 0, dm = Infinity;
+        grupos.forEach(function(g, i){ var d = dW(p, g.lab); if(d < dm){ dm = d; b = i; } });
+        baldes[b].push(p);
+      });
+      cb(grupos.map(function(g, i){
+        return { lab: baldes[i].length ? corRepresentativa(baldes[i]) : g.lab,
+                 pct: baldes[i].length/am.pts.length };
+      }).filter(function(c){ return c.pct >= 0.06; })
+        .sort(function(a,b){ return b.pct-a.pct; })
+        .slice(0,4));
+    };
+    im.src = dataURI;
+  }
+
+  function temaCategoria(nomeCat){
+    var s = (nomeCat||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    if(/anime|manga|otaku|naruto|dragon|one ?piece|jujutsu|demon/.test(s)) return 'anime';
+    if(/game|jogo|gamer|minecraft|mario|zelda|souls|pokemon|sonic/.test(s)) return 'games';
+    if(/marvel|dc\b|heroi|heroe|vingador|batman|homem|liga da justica|quadrinho/.test(s)) return 'heroi';
+    if(/carro|auto|hot ?wheels|veiculo|moto|f1|formula/.test(s)) return 'carros';
+    if(/desenho|cartoon|disney|pixar|infantil|crianca/.test(s)) return 'desenho';
+    if(/terror|horror|halloween|assombr|monstro/.test(s)) return 'terror';
+    if(/vaso|planta|flor|decor|casa|utilit/.test(s)) return 'decor';
+    return 'geral';
+  }
+
+  var GANCHOS = {
+    geral: ['{n} impresso em 3D, feito sob encomenda aqui no ateliê.',
+            '{n} saindo da impressora camada por camada, do jeito que colecionador gosta.',
+            '{n} para quem prefere ter a peça na estante, e não só na tela.'],
+    anime: ['{n} direto do anime para a sua estante.',
+            '{n} em versão de coleção, para quem já assistiu a série inteira mais de uma vez.',
+            '{n} pausado no melhor frame e trazido para o mundo real.'],
+    games: ['{n} saiu do jogo e apareceu na sua mesa.',
+            '{n} em versão física, dessa vez sem precisar de save.',
+            '{n} para quem zerou o jogo e queria levar alguma coisa junto.'],
+    heroi: ['{n} pronto para o pouso heroico na sua estante.',
+            '{n} em escala de coleção, pose e atitude inclusas.',
+            '{n} para quem escolheu um lado e não pretende mudar.'],
+    carros:['{n} estacionado na sua mesa — sem seguro, sem IPVA e sem multa.',
+            '{n} em miniatura, do tipo que nunca vai precisar de revisão.',
+            '{n} para quem ama o carro mas prefere a versão que cabe na estante.'],
+    desenho:['{n} do desenho para a prateleira, com a mesma cara de sempre.',
+            '{n} em versão física, para quem cresceu vendo e nunca largou.',
+            '{n} pronto para dividir espaço com o resto da coleção.'],
+    terror:['{n} para assombrar a estante em horário comercial.',
+            '{n} em versão de coleção, com todo o desconforto no lugar certo.',
+            '{n} para quem gosta de sustos que não se mexem.'],
+    decor: ['{n} impresso em 3D para dar personalidade ao ambiente.',
+            '{n} feito sob medida, do tipo que ninguém mais tem igual.',
+            '{n} para resolver aquele canto que estava pedindo alguma coisa.']
+  };
+  var CORPO_COR = [
+    'Impresso em PLA {c} — a cor vem do próprio filamento, sem tinta e sem adesivo.',
+    'Sai em {c}, tudo em impressão multicor, com acabamento fosco.',
+    'Feito em {c}, camada por camada, com acabamento fosco.'
+  ];
+  var CORPO_SEM = [
+    'Impresso em PLA com acabamento fosco, camada por camada.',
+    'Feito em PLA de boa qualidade, com acabamento fosco e base inclusa.',
+    'Impressão em PLA, com o acabamento ajustado peça por peça.'
+  ];
+  var TAMANHOS = [
+    'Disponível em {t}.',
+    'Sai em {t} — o tamanho muda o preço, o capricho não.',
+    'Escolha o tamanho: {t}.'
+  ];
+  var FECHOS = [
+    'Peça decorativa: ótima na estante, péssima como brinquedo.',
+    'Vai bem em estante, mesa de trabalho ou de presente para quem já tem tudo.',
+    'Pequenas variações de cor e linhas de camada fazem parte do processo — é impressão 3D, não peça injetada.',
+    'Feita uma por vez, então cada peça sai com um pouquinho de personalidade própria.',
+    'Se perguntarem se foi comprada pronta, o silêncio é uma resposta aceitável.'
+  ];
+
+  function embaralha(txt, giro){
+    var h = 0;
+    for(var i = 0; i < txt.length; i++) h = (h*31 + txt.charCodeAt(i)) >>> 0;
+    return h + (giro||0);
+  }
+  function pega(banco, semente){ return banco[semente % banco.length]; }
+  function lista(itens){
+    if(itens.length <= 1) return itens[0] || '';
+    return itens.slice(0,-1).join(', ') + ' e ' + itens[itens.length-1];
+  }
+
+  function geraDescricao(prod, cat, cores, giro){
+    var nome = (prod.nome||'').trim() || 'Esta peça';
+    var s = embaralha(nome + '|' + (cat.nome||''), giro);
+    var partes = [];
+
+    partes.push(pega(GANCHOS[temaCategoria(cat.nome)] || GANCHOS.geral, s).replace('{n}', nome));
+
+    var nomes = cores.map(function(c){
+      var rgb = hexRgb(oklabHex(c.lab));
+      return nomeCor(rgb[0], rgb[1], rgb[2]).toLowerCase();
+    }).filter(function(v, i, a){ return a.indexOf(v) === i; });
+    partes.push(nomes.length
+      ? pega(CORPO_COR, s+1).replace('{c}', lista(nomes))
+      : pega(CORPO_SEM, s+1));
+
+    var tams = (prod.vars||[]).map(function(v){ return (v.t||'').trim(); })
+      .filter(function(t, i, a){ return t && a.indexOf(t) === i; });
+    if(tams.length > 1) partes.push(pega(TAMANHOS, s+2).replace('{t}', lista(tams)));
+
+    partes.push(pega(FECHOS, s+3));
+    return partes.join(' ');
+  }
+
   /* ---------- editor de catálogo ---------- */
+  var giros = {};
   var MODOS = {apartir:'A partir de (vários tamanhos)', unico:'Preço único', consulta:'Sob consulta'};
 
   function renderCatalogo(){
@@ -2072,7 +2200,11 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
               '<input type="text" data-c="'+ci+'" data-p="'+pi+'" data-f="nome" value="'+escapa(p.nome)+'" placeholder="Nome do produto" style="flex:1;min-width:140px">' +
               '<span class="preco-lab" id="pl-'+ci+'-'+pi+'">'+pr.txt+'</span>' +
             '</div>' +
-            '<input type="text" data-c="'+ci+'" data-p="'+pi+'" data-f="desc" value="'+escapa(p.desc||'')+'" placeholder="Descrição curta: material, acabamento, base inclusa…">' +
+            '<textarea rows="3" data-c="'+ci+'" data-p="'+pi+'" data-f="desc" placeholder="Descrição: material, acabamento, base inclusa… ou gere uma abaixo.">'+escapa(p.desc||'')+'</textarea>' +
+            '<div style="display:flex; gap:7px; align-items:center; flex-wrap:wrap">' +
+              '<button class="btn tiny" data-gera='+alvo+' type="button">' + (p.desc ? 'Gerar outra descrição' : 'Gerar descrição') + '</button>' +
+              '<span class="sub">usa o nome, a categoria e as cores da foto</span>' +
+            '</div>' +
             '<select data-c="'+ci+'" data-p="'+pi+'" data-f="modo">' +
               Object.keys(MODOS).map(function(k){ return '<option value="'+k+'"'+(p.modo===k?' selected':'')+'>'+MODOS[k]+'</option>'; }).join('') +
             '</select>' +
@@ -2182,9 +2314,31 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
 
   var alvoImagem = null;
   $('listaCat').addEventListener('click', function(e){
-    var el = e.target.closest('[data-capa],[data-foto],[data-addprod],[data-rmcat],[data-rmprod],[data-addvar],[data-rmvar],[data-sobe],[data-desce],[data-sobep],[data-descep]');
+    var el = e.target.closest('[data-capa],[data-foto],[data-addprod],[data-rmcat],[data-rmprod],[data-addvar],[data-rmvar],[data-sobe],[data-desce],[data-sobep],[data-descep],[data-gera]');
     if(!el) return;
     var d = el.dataset, cats = catalogo(), ix;
+
+    if(d.gera !== undefined){
+      ix = d.gera.split('.');
+      var cGera = cats[ix[0]], pGera = cGera && cGera.produtos[ix[1]];
+      if(!pGera) return;
+      if(pGera.link){ el.textContent = 'Edite no original'; return; }
+      if(!(pGera.nome||'').trim()){
+        el.textContent = 'Dê um nome à peça antes';
+        setTimeout(function(){ el.textContent = 'Gerar descrição'; }, 2200);
+        return;
+      }
+      el.textContent = 'Escrevendo…';
+      giros[pGera.id] = (giros[pGera.id] || 0) + 1;
+      coresDaImagem(img('p:' + pGera.id), function(cores){
+        var atual = catalogo();
+        var alvoP = atual[ix[0]] && atual[ix[0]].produtos[ix[1]];
+        if(!alvoP) return;
+        alvoP.desc = geraDescricao(alvoP, atual[ix[0]], cores, giros[alvoP.id]);
+        setCatalogo(atual);
+      });
+      return;
+    }
 
     // Antes de apagar um original, transforma suas cópias vinculadas em cópias
     // independentes — senão elas ficariam apontando para o nada.
@@ -2904,8 +3058,8 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
   });
 
   /* ---------- início ---------- */
-  var tema = load('p3d.tema');
-  if(tema) document.documentElement.setAttribute('data-theme', tema);
+  var temaSalvo = load('p3d.tema');
+  if(temaSalvo) document.documentElement.setAttribute('data-theme', temaSalvo);
   var salvo = load('p3d.state.v2');
   if(salvo){ try{ aplica(JSON.parse(salvo)); }catch(e){} }
   aplicaImagens();
