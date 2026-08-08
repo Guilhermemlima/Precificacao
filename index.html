@@ -3404,7 +3404,8 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     if(m.indexOf('email not confirmed') > -1 || cod === 'email_not_confirmed')
       return 'E-mail ainda não confirmado. Abra o link que o Supabase enviou para você, ou desligue a confirmação em Authentication → Sign In / Providers → Email.';
     if(m.indexOf('invalid login credentials') > -1)
-      return 'E-mail ou senha não conferem. Se você acabou de criar a conta, o mais provável é que falte confirmar o e-mail: procure a mensagem do Supabase na caixa de entrada e no spam.';
+      return 'E-mail ou senha não conferem. Duas causas possíveis: a senha está diferente da cadastrada, ou a conta ainda não foi confirmada. ' +
+             'Verifique em Authentication → Users se o e-mail aparece na lista e se consta como confirmado.';
     if(m.indexOf('user already registered') > -1 || cod === 'user_already_exists')
       return 'Esta conta já existe. Use "Entrar" em vez de "Criar conta".';
     if(m.indexOf('password should be at least') > -1 || cod === 'weak_password')
