@@ -299,6 +299,37 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
 }
 #boxAnalise img{max-height:240px; cursor:crosshair}
 
+/* ---------- avisos ---------- */
+#avisosN{
+  display:none; margin-left:6px; font-family:var(--font-mono); font-size:11px; font-weight:700;
+  background:var(--bad); color:#fff; border-radius:999px; padding:1px 6px; vertical-align:middle;
+}
+#avisosN.on{display:inline-block}
+.aviso{
+  display:flex; gap:12px; align-items:flex-start; background:var(--surface); border:1px solid var(--line);
+  border-left:3px solid var(--muted); border-radius:10px; padding:13px 15px; margin-bottom:10px; box-shadow:var(--shadow);
+}
+.aviso.critico{border-left-color:var(--bad)}
+.aviso.atencao{border-left-color:var(--warn)}
+.aviso.info{border-left-color:var(--s1)}
+.aviso .ico{
+  font-family:var(--font-mono); font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+  padding:3px 8px; border-radius:5px; flex:none; white-space:nowrap;
+}
+.aviso.critico .ico{background:var(--bad); color:#fff}
+.aviso.atencao .ico{background:var(--warn); color:#fff}
+.aviso.info .ico{background:var(--s1); color:#fff}
+.aviso .txt{flex:1; min-width:0}
+.aviso .tt{font-size:14px; font-weight:600; line-height:1.35}
+.aviso .dd{font-size:12.5px; color:var(--ink-2); margin-top:3px; line-height:1.5}
+.aviso .dd b{color:var(--ink)}
+.tudo-certo{
+  text-align:center; padding:34px 20px; background:var(--surface); border:1px solid var(--line);
+  border-radius:12px; box-shadow:var(--shadow);
+}
+.tudo-certo .t{font-family:var(--font-display); font-size:19px; letter-spacing:.03em; color:var(--good)}
+.tudo-certo .s{font-size:13px; color:var(--muted); margin-top:5px}
+
 /* ---------- editor de catálogo ---------- */
 .cat{background:var(--surface); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); margin-bottom:14px}
 .cat-hd{display:flex; align-items:flex-start; gap:12px; padding:13px 15px; border-bottom:1px solid var(--line); flex-wrap:wrap}
@@ -470,6 +501,7 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
   </div>
   <nav class="tabs">
     <button class="tab on" id="tabCalc" type="button">Calculadora</button>
+    <button class="tab" id="tabAvisos" type="button">Avisos<span id="avisosN"></span></button>
     <button class="tab" id="tabGestao" type="button">Pedidos e painel</button>
     <button class="tab" id="tabCatalogo" type="button">Catálogo</button>
     <button class="tab" id="tabEstoque" type="button">Estoque e cores</button>
@@ -982,6 +1014,36 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
 
 </div>
 
+<!-- ============ AVISOS ============ -->
+<div id="viewAvisos" hidden>
+  <div class="mes-bar">
+    <span class="mes-lab">Prazos que o sistema usa para avisar</span>
+  </div>
+  <section class="card">
+    <div class="body">
+      <div class="row">
+        <div class="f">
+          <label for="diasFornecedor">Filamento demora a chegar</label>
+          <div class="inp"><input type="text" inputmode="decimal" id="diasFornecedor" data-dec="0" value="7"><span class="suf">dias</span></div>
+          <span class="sub">Do pedido ao fornecedor até bater na sua porta.</span>
+        </div>
+        <div class="f">
+          <label for="diasEnvio">Envio até o cliente</label>
+          <div class="inp"><input type="text" inputmode="decimal" id="diasEnvio" data-dec="0" value="5"><span class="suf">dias</span></div>
+          <span class="sub">Correios ou transportadora, do despacho à entrega.</span>
+        </div>
+        <div class="f">
+          <label for="diasAlerta">Avisar da entrega com</label>
+          <div class="inp"><input type="text" inputmode="decimal" id="diasAlerta" data-dec="0" value="5"><span class="suf">dias</span></div>
+          <span class="sub">Antecedência do aviso de prazo apertando.</span>
+        </div>
+      </div>
+      <p class="note">A data limite para comprar filamento sai de trás para frente: <b>entrega − envio − produção − chegada do filamento</b>. Se a conta já estourou, o aviso vira urgente.</p>
+    </div>
+  </section>
+  <div id="listaAvisos"></div>
+</div>
+
 <!-- ============ CATÁLOGO ============ -->
 <div id="viewCatalogo" hidden>
   <div class="mes-bar">
@@ -1146,7 +1208,8 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
     'fixosMes','horasProdMes','margem','comissao','taxaPagamento','imposto',
     'freteModo','freteValor','qtd1','desc1','qtd2','desc2','qtd3','desc3','precoTeste',
     'orcMarca','orcFone','orcContato','orcDoc','orcCliente','orcClienteContato','orcNumero',
-    'orcPrazo','orcValidade','orcPagamento','orcDescricao','orcObs','pctReserva','pctReinvest'];
+    'orcPrazo','orcValidade','orcPagamento','orcDescricao','orcObs','pctReserva','pctReinvest',
+    'diasFornecedor','diasEnvio','diasAlerta'];
 
   function val(id){ return parseNum($(id).value); }
 
@@ -1423,6 +1486,7 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
 
     salvaEstado();
     if(!$('viewGestao').hidden) renderGestao();
+    if(!$('viewAvisos').hidden) renderAvisos();
   }
 
   /* ---------- estado ---------- */
@@ -1606,16 +1670,25 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
     negociacao: 'Em negociação',
     aguardando: 'Aguardando pagamento',
     pago: 'Pago',
+    entregue: 'Entregue',
     cancelado: 'Cancelado'
   };
+  // Pago e entregue contam como receita; entregue é o que encerra os avisos.
+  function ehReceita(p){ return p.status === 'pago' || p.status === 'entregue'; }
+  function emAberto(p){ return p.status !== 'entregue' && p.status !== 'cancelado'; }
 
-  function pedidos(){ try{ return JSON.parse(load('p3d.pedidos.v1')||'[]'); }catch(e){ return []; } }
-  function setPedidos(a){ store('p3d.pedidos.v1', JSON.stringify(a)); renderGestao(); }
-
-  function hojeISO(){
-    var d = new Date();
+  function dataISO(d){
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   }
+  function deISO(s){ var p = String(s||'').split('-'); return new Date(+p[0], +p[1]-1, +p[2]); }
+  function addDias(iso, n){ var d = deISO(iso); d.setDate(d.getDate()+n); return dataISO(d); }
+  function diffDias(a, b){ return Math.round((deISO(b) - deISO(a))/86400000); }
+  function brData(iso){ var d = deISO(iso); return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR'); }
+
+  function pedidos(){ try{ return JSON.parse(load('p3d.pedidos.v1')||'[]'); }catch(e){ return []; } }
+  function setPedidos(a){ store('p3d.pedidos.v1', JSON.stringify(a)); renderGestao(); renderAvisos(); }
+
+  function hojeISO(){ return dataISO(new Date()); }
   function mesDe(iso){ return (iso||'').slice(0,7); }
   function mesNome(ym){
     if(!ym) return '';
@@ -1635,6 +1708,8 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
     return {
       id: 'p' + Date.now() + Math.random().toString(36).slice(2,6),
       data: hojeISO(),
+      entrega: addDias(hojeISO(), Math.max(0, val('orcPrazo'))),
+      gramas: r.gramasTotal * q,
       cliente: texto('orcCliente') || 'Sem cliente',
       peca: texto('nomePeca') || 'Peça 3D',
       qtd: q,
@@ -1853,7 +1928,7 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
     if(sel.value === 'tudo') atual = 'tudo';
 
     var noMes = function(p){ return atual === 'tudo' || mesDe(p.data) === atual; };
-    var pagos = todos.filter(function(p){ return p.status === 'pago' && noMes(p); });
+    var pagos = todos.filter(function(p){ return ehReceita(p) && noMes(p); });
     var s = resumo(pagos);
     var aguard = resumo(todos.filter(function(p){ return p.status === 'aguardando' && noMes(p); }));
     var negoc  = resumo(todos.filter(function(p){ return p.status === 'negociacao' && noMes(p); }));
@@ -1882,7 +1957,7 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
     var serie = [];
     for(var i = 5; i >= 0; i--){
       var m = mesAnterior(base, i);
-      serie.push({ m:m, v:resumo(todos.filter(function(p){ return p.status === 'pago' && mesDe(p.data) === m; })).receita });
+      serie.push({ m:m, v:resumo(todos.filter(function(p){ return ehReceita(p) && mesDe(p.data) === m; })).receita });
     }
     var topo = Math.max.apply(null, serie.map(function(x){ return x.v; }).concat([1]));
     // Rótulo direto só no mês selecionado e no melhor mês; o resto fica no hover.
@@ -1925,7 +2000,7 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
     $('hintReserva').textContent = money(lucroPos*(pR+pI)) + ' guardado';
 
     // ---- payback da impressora
-    var todosPagos = resumo(todos.filter(function(p){ return p.status === 'pago'; }));
+    var todosPagos = resumo(todos.filter(ehReceita));
     var invest = val('precoMaquina');
     var pago = invest > 0 ? Math.min(1, todosPagos.lucroLiquido/invest) : 0;
     $('meterFill').style.width = Math.max(0, pago*100) + '%';
@@ -1946,12 +2021,13 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
       return;
     }
     t.innerHTML =
-      '<thead><tr><th>Data</th><th>Cliente</th><th>Peça</th><th class="n">Qtd</th><th class="n">Receita</th>'+
+      '<thead><tr><th>Data</th><th>Entrega</th><th>Cliente</th><th>Peça</th><th class="n">Qtd</th><th class="n">Receita</th>'+
       '<th class="n">Lucro</th><th>Status</th><th></th></tr></thead><tbody>' +
       lista.map(function(p){
         var l = lucroDe(p);
         return '<tr>'+
           '<td><input type="date" class="dt" data-id="'+p.id+'" value="'+(p.data||'')+'"></td>'+
+          '<td><input type="date" class="dt en" data-id="'+p.id+'" value="'+(p.entrega||'')+'"></td>'+
           '<td>'+escapa(p.cliente)+'</td>'+
           '<td>'+escapa(p.peca)+'</td>'+
           '<td class="n">'+p.qtd+'</td>'+
@@ -1972,7 +2048,8 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
     var a = pedidos(), p = a.find(function(x){ return x.id === id; });
     if(!p) return;
     if(el.classList.contains('st')) p.status = el.value;
-    if(el.classList.contains('dt')) p.data = el.value || hojeISO();
+    else if(el.classList.contains('en')) p.entrega = el.value || '';
+    else if(el.classList.contains('dt')) p.data = el.value || hojeISO();
     setPedidos(a);
   });
   $('tabPedidos').addEventListener('click', function(e){
@@ -2487,6 +2564,7 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
   function setEstoque(a, redesenha){
     store('p3d.estoque.v1', JSON.stringify(a));
     if(redesenha !== false) renderEstoque();
+    renderAvisos();
   }
 
   function renderEstoque(){
@@ -2933,9 +3011,125 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
   $('nCores').addEventListener('change', analisaFoto);
   $('ignoraFundo').addEventListener('change', analisaFoto);
 
+  /* ---------- avisos ----------
+     Tudo é derivado de pedidos e estoque; nada fica gravado como "aviso".
+     Silenciar guarda só a data, e o aviso volta se continuar valendo. */
+  function silenciados(){ try{ return JSON.parse(load('p3d.silencio.v1')||'{}'); }catch(e){ return {}; } }
+  function silencia(chave){
+    var s = silenciados();
+    s[chave] = hojeISO();
+    store('p3d.silencio.v1', JSON.stringify(s));
+    renderAvisos();
+  }
+  var DIAS_SILENCIO = 5;
+
+  function geraAvisos(){
+    var hoje = hojeISO(), av = [];
+    var forn = Math.max(0, val('diasFornecedor'));
+    var envio = Math.max(0, val('diasEnvio'));
+    var antec = Math.max(0, val('diasAlerta'));
+    var abertos = pedidos().filter(emAberto);
+
+    abertos.forEach(function(p){
+      var nome = p.peca + ' · ' + p.cliente;
+      if(!p.entrega){
+        av.push({ch:'sd-'+p.id, nivel:'info', ico:'prazo', tt:'Pedido sem data de entrega',
+          dd:'<b>'+escapa(nome)+'</b> não tem prazo definido. Preencha a coluna <b>Entrega</b> em Pedidos para o sistema poder avisar você.'});
+        return;
+      }
+      var faltam = diffDias(hoje, p.entrega);
+      // Produção: uma jornada de 8 h de impressão por dia, no mínimo um dia.
+      var producao = Math.max(1, Math.ceil((p.horas||0)/8));
+      var comprarAte = addDias(p.entrega, -(envio + producao + forn));
+      var diasCompra = diffDias(hoje, comprarAte);
+
+      if(faltam < 0){
+        av.push({ch:'atr-'+p.id, nivel:'critico', ico:'atrasado', tt:'Pedido atrasado',
+          dd:'<b>'+escapa(nome)+'</b> venceu em <b>'+brData(p.entrega)+'</b>, há '+Math.abs(faltam)+' dia(s). Status atual: '+STATUS[p.status]+'.'});
+      } else if(faltam <= antec){
+        av.push({ch:'ent-'+p.id, nivel:faltam <= 2 ? 'critico' : 'atencao', ico:faltam+'d',
+          tt:faltam === 0 ? 'Entrega é hoje' : 'Entrega em '+faltam+' dia(s)',
+          dd:'<b>'+escapa(nome)+'</b> tem entrega em <b>'+brData(p.entrega)+'</b>. Precisa despachar até <b>'+brData(addDias(p.entrega, -envio))+'</b> para chegar no prazo.'});
+      }
+
+      if(faltam >= 0 && diasCompra <= 3){
+        av.push({ch:'fil-'+p.id, nivel:diasCompra < 0 ? 'critico' : 'atencao', ico:'filamento',
+          tt:diasCompra < 0 ? 'Prazo de compra de filamento estourou' : (diasCompra === 0 ? 'Comprar filamento hoje' : 'Comprar filamento em até '+diasCompra+' dia(s)'),
+          dd:'Para <b>'+escapa(nome)+'</b> entregar em '+brData(p.entrega)+': o filamento precisa ser pedido até <b>'+brData(comprarAte)+'</b> ' +
+             '(chega em '+forn+'d, imprime em '+producao+'d, envia em '+envio+'d).' +
+             (diasCompra < 0 ? ' Se não tiver o filamento aí, negocie um prazo novo agora.' : '')});
+      }
+
+      var parado = diffDias(p.data, hoje);
+      if(p.status === 'negociacao' && parado >= 7){
+        av.push({ch:'neg-'+p.id, nivel:'info', ico:'parado', tt:'Proposta parada há '+parado+' dias',
+          dd:'<b>'+escapa(nome)+'</b> ('+money(p.receita)+') segue em negociação desde '+brData(p.data)+'. Vale um retorno antes de dar como perdida.'});
+      }
+      if(p.status === 'aguardando' && parado >= 5){
+        av.push({ch:'agu-'+p.id, nivel:'atencao', ico:'a receber', tt:'Pagamento pendente há '+parado+' dias',
+          dd:'<b>'+escapa(nome)+'</b> aguarda '+money(p.receita)+' desde '+brData(p.data)+'.'});
+      }
+    });
+
+    // Estoque
+    var minimo = parseNum($('estoqueMin').value);
+    estoque().forEach(function(x, i){
+      var g = parseNum(x.g), nome = x.nome || 'Rolo sem nome';
+      if(g <= 0){
+        av.push({ch:'rz-'+i+'-'+nome, nivel:'critico', ico:'acabou', tt:'Filamento acabado: '+escapa(nome),
+          dd:'O rolo <b>'+escapa(nome)+'</b> está zerado. Reponha antes de aceitar pedido que use essa cor.'});
+      } else if(g < minimo){
+        av.push({ch:'rb-'+i+'-'+nome, nivel:'atencao', ico:num(g,0)+'g', tt:'Filamento acabando: '+escapa(nome),
+          dd:'Restam <b>'+num(g,0)+' g</b> (mínimo de '+num(minimo,0)+' g). Com '+forn+' dias de entrega do fornecedor, peça até <b>'+brData(addDias(hoje, 2))+'</b> para não parar a produção.'});
+      }
+    });
+
+    // Demanda dos pedidos abertos contra o que existe no estoque
+    var precisa = abertos.reduce(function(k,p){ return k + (p.gramas||0); }, 0);
+    var tem = estoque().reduce(function(k,x){ return k + parseNum(x.g); }, 0);
+    if(precisa > 0 && precisa > tem){
+      av.push({ch:'dem', nivel:'critico', ico:'estoque', tt:'Estoque não cobre os pedidos em aberto',
+        dd:'Os pedidos em aberto consomem cerca de <b>'+num(precisa,0)+' g</b> e você tem <b>'+num(tem,0)+' g</b> cadastrados. Faltam '+num(precisa-tem,0)+' g.'});
+    } else if(precisa > 0 && precisa > tem*0.7){
+      av.push({ch:'dem2', nivel:'atencao', ico:'estoque', tt:'Estoque apertado para os pedidos em aberto',
+        dd:'Os pedidos em aberto consomem <b>'+num(precisa,0)+' g</b> dos <b>'+num(tem,0)+' g</b> que você tem. Sobra pouco para imprevisto ou peça refeita.'});
+    }
+
+    var sil = silenciados();
+    var ordem = {critico:0, atencao:1, info:2};
+    return av.filter(function(a){
+      return !sil[a.ch] || diffDias(sil[a.ch], hoje) >= DIAS_SILENCIO;
+    }).sort(function(a,b){ return ordem[a.nivel] - ordem[b.nivel]; });
+  }
+
+  function renderAvisos(){
+    var av = geraAvisos();
+    var criticos = av.filter(function(a){ return a.nivel === 'critico'; }).length;
+    var badge = $('avisosN');
+    badge.textContent = av.length || '';
+    badge.classList.toggle('on', av.length > 0);
+    badge.style.background = criticos ? 'var(--bad)' : 'var(--warn)';
+
+    $('listaAvisos').innerHTML = av.length
+      ? av.map(function(a){
+          return '<div class="aviso '+a.nivel+'">' +
+            '<span class="ico">'+a.ico+'</span>' +
+            '<div class="txt"><div class="tt">'+a.tt+'</div><div class="dd">'+a.dd+'</div></div>' +
+            '<button class="btn tiny ghost" data-sil="'+escapa(a.ch)+'" type="button">Silenciar</button>' +
+          '</div>';
+        }).join('')
+      : '<div class="tudo-certo"><div class="t">Nada pendente</div>' +
+        '<div class="s">Nenhum pedido atrasado, nenhum prazo apertando e nenhum rolo abaixo do mínimo.</div></div>';
+  }
+
+  $('listaAvisos').addEventListener('click', function(e){
+    var b = e.target.closest('[data-sil]');
+    if(b) silencia(b.dataset.sil);
+  });
+
   /* ---------- abas ----------
      Lista única: quem adicionar aba nova mexe só aqui. */
-  var ABAS = ['calc','gestao','catalogo','estoque'];
+  var ABAS = ['calc','avisos','gestao','catalogo','estoque'];
   function trocaAba(qual){
     if(ABAS.indexOf(qual) < 0) qual = 'calc';
     ABAS.forEach(function(v){
@@ -2943,6 +3137,7 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
       $('view' + nome).hidden = (v !== qual);
       $('tab' + nome).classList.toggle('on', v === qual);
     });
+    if(qual === 'avisos') renderAvisos();
     if(qual === 'gestao') renderGestao();
     if(qual === 'catalogo') renderCatalogo();
     if(qual === 'estoque'){ renderEstoque(); mostraAnalise(); }
@@ -3050,6 +3245,7 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
   var minEst = load('p3d.estoqueMin');
   if(minEst) $('estoqueMin').value = minEst;
   renderEstoque();
+  renderAvisos();
   trocaAba(load('p3d.aba') || 'calc');
   imgCarregaTudo().then(renderCatalogo);
 })();

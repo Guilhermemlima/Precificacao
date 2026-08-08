@@ -63,6 +63,32 @@ Indicadores do mês:
 
 Mais: gráfico de receita dos últimos 6 meses, composição da receita do mês, pipeline em aberto, e a divisão do lucro entre reserva para refazer peça, reinvestimento e o que sobra para você — tudo em percentuais que você define.
 
+## Avisos
+
+Central de alertas derivada dos pedidos e do estoque — nada fica gravado como "aviso", tudo é recalculado. O contador aparece na barra de abas, visível de qualquer tela.
+
+O cálculo que importa é a **data limite para comprar filamento**, feito de trás para frente:
+
+```
+comprar até = entrega − envio − produção − chegada do filamento
+```
+
+Produção sai do tempo de impressão do pedido, a uma jornada de 8 h por dia. Exemplo real: entrega em 15 dias, 16 h de impressão, fornecedor em 7 dias e envio em 5 → o filamento precisa ser pedido em até 1 dia.
+
+Alertas gerados:
+
+| Tipo | Quando |
+|---|---|
+| Pedido atrasado | prazo venceu e não foi entregue |
+| Entrega próxima | dentro da antecedência configurada (crítico com 2 dias ou menos) |
+| Comprar filamento | data limite a 3 dias ou já vencida |
+| Filamento acabado / acabando | rolo zerado ou abaixo do mínimo |
+| Estoque não cobre os pedidos | soma das gramas em aberto maior que o estoque |
+| Proposta parada | em negociação há 7 dias ou mais |
+| Pagamento pendente | aguardando há 5 dias ou mais |
+
+Cada aviso pode ser silenciado por 5 dias; depois volta se ainda fizer sentido. O status **entregue** encerra os avisos do pedido — e conta como receita no painel, junto com **pago**.
+
 ## Estoque e cores
 
 Cadastro de rolos: cor, nome, tipo, marca, gramas restantes e preço do quilo. Resumo com total em kg, valor parado em estoque, quantos rolos estão abaixo do mínimo e quantas cores diferentes você tem para multicor.
