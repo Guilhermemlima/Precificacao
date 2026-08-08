@@ -324,6 +324,30 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
 }
 #boxAnalise img{max-height:240px; cursor:crosshair}
 
+/* ---------- nuvem ---------- */
+.luz{
+  width:8px; height:8px; border-radius:50%; background:var(--muted); flex:none;
+  box-shadow:0 0 0 2px color-mix(in srgb, var(--muted) 25%, transparent);
+}
+.luz.on{background:var(--good); box-shadow:0 0 0 2px color-mix(in srgb, var(--good) 25%, transparent)}
+.luz.erro{background:var(--bad); box-shadow:0 0 0 2px color-mix(in srgb, var(--bad) 25%, transparent)}
+.luz.sync{background:var(--accent); animation:pisca 1s ease-in-out infinite}
+@keyframes pisca{50%{opacity:.25}}
+dialog#dlgNuvem{
+  border:1px solid var(--line); border-radius:14px; background:var(--surface); color:var(--ink);
+  padding:22px 24px 24px; max-width:660px; width:calc(100% - 28px); box-shadow:0 24px 60px -20px rgba(0,0,0,.5);
+}
+dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px)}
+.dlg-x{display:flex; justify-content:flex-end; margin:-6px -6px 0 0}
+.dlg-t{font-size:20px; letter-spacing:.02em; text-transform:uppercase; margin-top:2px}
+.dlg-s{font-size:13px; color:var(--ink-2); line-height:1.5; margin:6px 0 0}
+.dlg-passo{margin-top:20px; padding-top:16px; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:12px}
+.nv-status{font-size:13px; line-height:1.6; color:var(--ink-2)}
+.nv-status b{color:var(--ink)}
+.nv-status .l{display:flex; gap:8px; align-items:baseline}
+.nv-status .ok{color:var(--good); font-weight:600}
+.nv-status .er{color:var(--bad); font-weight:600}
+
 /* ---------- avisos ---------- */
 #avisosN{
   display:none; margin-left:6px; font-family:var(--font-mono); font-size:11px; font-weight:700;
@@ -516,6 +540,7 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
       </div>
     </div>
     <div class="top-actions">
+      <button class="btn" id="btnNuvem" type="button"><span id="nuvemLuz" class="luz"></span><span id="nuvemTxt">Nuvem</span></button>
       <button class="btn" id="btnTheme" type="button">Tema</button>
       <button class="btn" id="btnCopy" type="button">Copiar orçamento</button>
       <button class="btn" id="btnExport" type="button">Exportar</button>
@@ -1146,6 +1171,56 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
 </div>
 
 </div>
+
+<dialog id="dlgNuvem">
+  <form method="dialog" class="dlg-x"><button class="btn tiny ghost" type="submit">Fechar</button></form>
+  <h2 class="dlg-t">Sincronizar na nuvem</h2>
+  <p class="dlg-s">Os dados continuam salvos neste aparelho e funcionando sem internet. A nuvem serve para não perder nada e para o celular e o computador verem os mesmos pedidos.</p>
+
+  <div class="dlg-passo">
+    <div class="mini-label">1 · Projeto do Supabase</div>
+    <div class="row">
+      <div class="f">
+        <label for="nvUrl">URL do projeto</label>
+        <div class="inp"><input class="txt" type="text" id="nvUrl" placeholder="https://xxxxxxxx.supabase.co" autocomplete="off"></div>
+      </div>
+      <div class="f">
+        <label for="nvKey">Chave pública (anon)</label>
+        <div class="inp"><input class="txt" type="password" id="nvKey" placeholder="eyJhbGciOi…" autocomplete="off"></div>
+        <span class="sub">Em Project Settings → API. Esta chave é feita para ficar no navegador; quem protege os dados é o login.</span>
+      </div>
+    </div>
+    <p class="note">Antes de conectar, rode o arquivo <b>supabase-schema.sql</b> (que está no repositório) no <b>SQL Editor</b> do seu projeto. Ele cria a tabela, as regras de acesso e o espaço das imagens.</p>
+  </div>
+
+  <div class="dlg-passo">
+    <div class="mini-label">2 · Sua conta</div>
+    <div class="row">
+      <div class="f">
+        <label for="nvEmail">E-mail</label>
+        <div class="inp"><input class="txt" type="email" id="nvEmail" autocomplete="username"></div>
+      </div>
+      <div class="f">
+        <label for="nvSenha">Senha</label>
+        <div class="inp"><input class="txt" type="password" id="nvSenha" autocomplete="current-password"></div>
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap">
+      <button class="btn primary" type="button" id="nvEntrar">Entrar</button>
+      <button class="btn" type="button" id="nvCriar">Criar conta</button>
+      <button class="btn ghost" type="button" id="nvSair" hidden>Sair deste aparelho</button>
+    </div>
+  </div>
+
+  <div class="dlg-passo">
+    <div class="mini-label">3 · Situação</div>
+    <div id="nvStatus" class="nv-status"></div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px">
+      <button class="btn primary" type="button" id="nvSync" hidden>Sincronizar agora</button>
+      <button class="btn" type="button" id="nvEnviarTudo" hidden>Enviar tudo deste aparelho</button>
+    </div>
+  </div>
+</dialog>
 
 <div id="tip"></div>
 
@@ -3259,6 +3334,374 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
     }
   });
 
+  /* ---------- nuvem: sincronização local-first ----------
+     O navegador continua sendo o armazenamento de trabalho. A nuvem é
+     cópia e ponte entre aparelhos. Cada documento carrega a hora da
+     última alteração; em conflito, vence o mais recente.
+     Falamos com a API REST do Supabase por fetch, sem biblioteca. */
+
+  function cfgNuvem(){ try{ return JSON.parse(load('p3d.nuvem')||'{}'); }catch(e){ return {}; } }
+  function setCfgNuvem(c){ store('p3d.nuvem', JSON.stringify(c)); }
+  function sessao(){ try{ return JSON.parse(load('p3d.sessao')||'null'); }catch(e){ return null; } }
+  function setSessao(s){ if(s) store('p3d.sessao', JSON.stringify(s)); else { try{ localStorage.removeItem('p3d.sessao'); }catch(e){} delete mem['p3d.sessao']; } }
+  function carimbos(){ try{ return JSON.parse(load('p3d.carimbos')||'{}'); }catch(e){ return {}; } }
+  function setCarimbos(c){ store('p3d.carimbos', JSON.stringify(c)); }
+  function tumulos(){ try{ return JSON.parse(load('p3d.tumulos')||'[]'); }catch(e){ return []; } }
+  function setTumulos(t){ store('p3d.tumulos', JSON.stringify(t)); }
+  var marcaAgua = function(){ return load('p3d.marcaAgua') || '1970-01-01T00:00:00Z'; };
+
+  var sincronizando = false, agendado = null, ultimoErro = null;
+
+  function agendaSync(){
+    if(!prontoParaSync()) return;
+    clearTimeout(agendado);
+    agendado = setTimeout(function(){ sincronizar().catch(function(){}); }, 4000);
+  }
+  function prontoParaSync(){
+    var c = cfgNuvem(), s = sessao();
+    return !!(c.url && c.key && s && s.refresh_token && navigator.onLine !== false);
+  }
+
+  // Marca um documento como alterado agora.
+  function marca(colecao, id){
+    var c = carimbos();
+    c[colecao + ':' + id] = new Date().toISOString();
+    setCarimbos(c);
+    agendaSync();
+  }
+  // Compara a lista nova com a antiga e carimba só o que mudou; o que sumiu vira túmulo.
+  function carimbaLista(colecao, novos, antigos){
+    var ant = {};
+    (antigos||[]).forEach(function(x){ if(x && x.id) ant[x.id] = JSON.stringify(x); });
+    var c = carimbos(), t = tumulos(), agora = new Date().toISOString(), mudou = false;
+    (novos||[]).forEach(function(x){
+      if(!x || !x.id) return;
+      if(ant[x.id] !== JSON.stringify(x)){ c[colecao + ':' + x.id] = agora; mudou = true; }
+      delete ant[x.id];
+    });
+    Object.keys(ant).forEach(function(id){
+      t.push({colecao:colecao, id:id, at:agora});
+      delete c[colecao + ':' + id];
+      mudou = true;
+    });
+    if(mudou){ setCarimbos(c); setTumulos(t); agendaSync(); }
+  }
+
+  /* --- chamadas HTTP --- */
+  function api(caminho, opcoes, comToken){
+    var c = cfgNuvem();
+    var o = opcoes || {};
+    o.headers = Object.assign({'apikey': c.key, 'Content-Type': 'application/json'}, o.headers || {});
+    if(comToken){
+      var s = sessao();
+      o.headers['Authorization'] = 'Bearer ' + (s && s.access_token);
+    }
+    return fetch(c.url.replace(/\/+$/,'') + caminho, o).then(function(r){
+      return r.text().then(function(txt){
+        var corpo = null;
+        try{ corpo = txt ? JSON.parse(txt) : null; }catch(e){ corpo = txt; }
+        if(!r.ok){
+          var msg = (corpo && (corpo.error_description || corpo.msg || corpo.message || corpo.error)) || ('erro ' + r.status);
+          var err = new Error(msg); err.status = r.status; throw err;
+        }
+        return corpo;
+      });
+    });
+  }
+
+  function guardaSessao(d){
+    setSessao({
+      access_token: d.access_token,
+      refresh_token: d.refresh_token,
+      expira_em: Date.now() + (d.expires_in || 3600)*1000 - 60000,
+      user_id: d.user && d.user.id,
+      email: d.user && d.user.email
+    });
+  }
+  function entrar(email, senha){
+    return api('/auth/v1/token?grant_type=password', {
+      method:'POST', body: JSON.stringify({email:email, password:senha})
+    }).then(guardaSessao);
+  }
+  function criarConta(email, senha){
+    return api('/auth/v1/signup', {
+      method:'POST', body: JSON.stringify({email:email, password:senha})
+    }).then(function(d){
+      if(d && d.access_token) guardaSessao(d);
+      return d;
+    });
+  }
+  function renovaToken(){
+    var s = sessao();
+    if(!s) return Promise.reject(new Error('sem sessão'));
+    if(s.expira_em && Date.now() < s.expira_em) return Promise.resolve();
+    return api('/auth/v1/token?grant_type=refresh_token', {
+      method:'POST', body: JSON.stringify({refresh_token: s.refresh_token})
+    }).then(guardaSessao);
+  }
+
+  /* --- o que entra e o que sai --- */
+  // Documentos inteiros: mudam pouco e quase sempre num aparelho só.
+  var DOCS = {
+    config:   { ler: function(){ return estado(); },            gravar: function(v){ aplica(v); } },
+    catalogo: { ler: function(){ return {lista: catalogo()}; }, gravar: function(v){ setCatalogo(v.lista||[]); } },
+    peca:     { ler: function(){ return {lista: lib()}; },      gravar: function(v){ setLib(v.lista||[]); } }
+  };
+  // Enquanto aplicamos o que veio de fora, os salvamentos não podem
+  // carimbar nada — senão o dado volta a subir e vira eco sem fim.
+  var aplicandoRemoto = false;
+
+  // `recemAplicados` são as chaves que acabaram de chegar do servidor neste
+  // mesmo ciclo. Sem excluí-las, elas voltariam a subir: a marca d'água só
+  // avança no fim, então elas ainda parecem alteração local.
+  function locaisParaEnviar(recemAplicados){
+    var pular = recemAplicados || {};
+    var c = carimbos(), marca0 = marcaAgua(), saida = [];
+    var pedidosMapa = {}; pedidos().forEach(function(p){ pedidosMapa[p.id] = p; });
+    var rolosMapa = {};   estoque().forEach(function(x){ if(x.id) rolosMapa[x.id] = x; });
+
+    Object.keys(c).forEach(function(chave){
+      if(c[chave] <= marca0 || pular[chave]) return;
+      var i = chave.indexOf(':'), colecao = chave.slice(0, i), id = chave.slice(i+1);
+      var conteudo = null;
+      if(colecao === 'pedido') conteudo = pedidosMapa[id];
+      else if(colecao === 'rolo') conteudo = rolosMapa[id];
+      else if(colecao === 'imagem') conteudo = imgCache[id] ? {d: imgCache[id]} : null;
+      else if(DOCS[colecao]) conteudo = DOCS[colecao].ler();
+      if(conteudo) saida.push({colecao:colecao, id:id, conteudo:conteudo, apagado:false, _at:c[chave]});
+    });
+    // Túmulos ficam na lista até o servidor confirmar; não dependem de relógio.
+    tumulos().forEach(function(t){
+      saida.push({colecao:t.colecao, id:t.id, conteudo:{}, apagado:true, _at:t.at, _tumulo:true});
+    });
+    return saida;
+  }
+
+  function aplicaRemoto(linhas){
+    if(!linhas.length) return {};
+    aplicandoRemoto = true;
+    try{ return aplicaRemotoInterno(linhas); }
+    finally{ aplicandoRemoto = false; }
+  }
+
+  function aplicaRemotoInterno(linhas){
+    var aplicados = {};
+    var c = carimbos();
+    var peds = pedidos(), pedMudou = false;
+    var rolos = estoque(), rolMudou = false;
+
+    linhas.forEach(function(l){
+      var chave = l.colecao + ':' + l.id;
+      // Só aceita o remoto se ele for mais novo que a versão daqui.
+      if(c[chave] && c[chave] > l.atualizado_em) return;
+
+      if(l.colecao === 'pedido'){
+        var i = peds.findIndex(function(p){ return p.id === l.id; });
+        if(l.apagado){ if(i > -1){ peds.splice(i,1); pedMudou = true; } }
+        else { if(i > -1) peds[i] = l.conteudo; else peds.push(l.conteudo); pedMudou = true; }
+      } else if(l.colecao === 'rolo'){
+        var j = rolos.findIndex(function(x){ return x.id === l.id; });
+        if(l.apagado){ if(j > -1){ rolos.splice(j,1); rolMudou = true; } }
+        else { if(j > -1) rolos[j] = l.conteudo; else rolos.push(l.conteudo); rolMudou = true; }
+      } else if(l.colecao === 'imagem'){
+        if(l.apagado) imgSalva(l.id, '');
+        else if(l.conteudo && l.conteudo.d) imgSalva(l.id, l.conteudo.d);
+      } else if(DOCS[l.colecao] && !l.apagado){
+        DOCS[l.colecao].gravar(l.conteudo);
+      }
+      c[chave] = l.atualizado_em;
+      aplicados[chave] = true;
+    });
+
+    setCarimbos(c);
+    if(pedMudou) store('p3d.pedidos.v1', JSON.stringify(peds));
+    if(rolMudou) store('p3d.estoque.v1', JSON.stringify(rolos));
+    if(pedMudou || rolMudou){ renderEstoque(); renderGestao(); renderAvisos(); }
+    renderCatalogo();
+    renderLib();
+    return aplicados;
+  }
+
+  function sincronizar(){
+    if(sincronizando || !prontoParaSync()) return Promise.resolve();
+    sincronizando = true; ultimoErro = null; luzNuvem();
+
+    var maior = marcaAgua();
+    return renovaToken().then(function(){
+      return api('/rest/v1/dados?select=colecao,id,conteudo,atualizado_em,apagado' +
+                 '&atualizado_em=gt.' + encodeURIComponent(marcaAgua()) +
+                 '&order=atualizado_em.asc', {method:'GET'}, true);
+    }).then(function(linhas){
+      linhas = linhas || [];
+      linhas.forEach(function(l){ if(l.atualizado_em > maior) maior = l.atualizado_em; });
+      var aplicados = aplicaRemoto(linhas);
+      var envio = locaisParaEnviar(aplicados);
+      if(!envio.length) return null;
+      var s = sessao();
+      var enviadosAt = {};
+      var corpo = envio.map(function(e){
+        enviadosAt[e.colecao + ':' + e.id] = e._at;
+        return {usuario:s.user_id, colecao:e.colecao, id:e.id, conteudo:e.conteudo, apagado:e.apagado};
+      });
+      return api('/rest/v1/dados?on_conflict=usuario,colecao,id', {
+        method:'POST',
+        headers:{'Prefer':'resolution=merge-duplicates,return=representation'},
+        body: JSON.stringify(corpo)
+      }, true).then(function(gravadas){ return {gravadas:gravadas, enviadosAt:enviadosAt}; });
+    }).then(function(r){
+      // Adota a hora do servidor como carimbo do que subiu. Sem isso, um
+      // aparelho com relógio adiantado reenviaria os mesmos registros para
+      // sempre, porque o carimbo local nunca ficaria abaixo da marca d'água.
+      if(r && r.gravadas){
+        var c = carimbos(), confirmados = {};
+        r.gravadas.forEach(function(l){
+          var chave = l.colecao + ':' + l.id;
+          confirmados[chave] = true;
+          // Só adota se ninguém mexeu no registro durante a subida.
+          if(c[chave] === r.enviadosAt[chave] || l.apagado) c[chave] = l.atualizado_em;
+          if(l.atualizado_em > maior) maior = l.atualizado_em;
+        });
+        setCarimbos(c);
+        setTumulos(tumulos().filter(function(t){ return !confirmados[t.colecao + ':' + t.id]; }));
+      }
+      store('p3d.marcaAgua', maior);
+      store('p3d.syncEm', new Date().toISOString());
+      sincronizando = false; luzNuvem(); statusNuvem();
+    }).catch(function(e){
+      sincronizando = false;
+      ultimoErro = e.message || String(e);
+      luzNuvem(); statusNuvem();
+      throw e;
+    });
+  }
+
+  function enviarTudo(){
+    var c = carimbos(), agora = new Date().toISOString();
+    pedidos().forEach(function(p){ c['pedido:' + p.id] = agora; });
+    estoque().forEach(function(x){ if(x.id) c['rolo:' + x.id] = agora; });
+    Object.keys(imgCache).forEach(function(k){ c['imagem:' + k] = agora; });
+    Object.keys(DOCS).forEach(function(d){ c[d + ':doc'] = agora; });
+    setCarimbos(c);
+    return sincronizar();
+  }
+
+  /* --- interface --- */
+  function luzNuvem(){
+    var l = $('nuvemLuz'), t = $('nuvemTxt');
+    l.className = 'luz';
+    if(sincronizando){ l.classList.add('sync'); t.textContent = 'Sincronizando'; return; }
+    if(ultimoErro){ l.classList.add('erro'); t.textContent = 'Nuvem'; return; }
+    if(prontoParaSync()){ l.classList.add('on'); t.textContent = 'Nuvem'; return; }
+    t.textContent = 'Nuvem';
+  }
+  function statusNuvem(){
+    var c = cfgNuvem(), s = sessao(), el = $('nvStatus'), linhas = [];
+    if(!c.url || !c.key) linhas.push('<div class="l">Falta informar a URL e a chave do projeto.</div>');
+    else linhas.push('<div class="l"><span class="ok">✓</span> Projeto configurado.</div>');
+
+    if(s && s.email) linhas.push('<div class="l"><span class="ok">✓</span> Conectado como <b>' + escapa(s.email) + '</b>.</div>');
+    else linhas.push('<div class="l">Sem login neste aparelho.</div>');
+
+    var q = load('p3d.syncEm');
+    if(q) linhas.push('<div class="l">Última sincronização: <b>' + new Date(q).toLocaleString('pt-BR') + '</b>.</div>');
+    var pend = prontoParaSync() ? locaisParaEnviar().length : 0;
+    if(pend) linhas.push('<div class="l">' + pend + ' alteração(ões) esperando para subir.</div>');
+    if(ultimoErro) linhas.push('<div class="l"><span class="er">✗</span> ' + escapa(ultimoErro) + '</div>');
+    if(navigator.onLine === false) linhas.push('<div class="l">Sem internet agora — sobe assim que voltar.</div>');
+
+    el.innerHTML = linhas.join('');
+    $('nvSync').hidden = !prontoParaSync();
+    $('nvEnviarTudo').hidden = !prontoParaSync();
+    $('nvSair').hidden = !s;
+    luzNuvem();
+  }
+
+  function salvaCfgDaTela(){
+    setCfgNuvem({url: $('nvUrl').value.trim(), key: $('nvKey').value.trim()});
+  }
+  function comBotao(btn, rotulo, promessa){
+    var antes = btn.textContent;
+    btn.disabled = true; btn.textContent = rotulo;
+    promessa.then(function(){
+      btn.textContent = 'Pronto';
+    }).catch(function(e){
+      ultimoErro = e.message || String(e);
+      btn.textContent = 'Falhou';
+    }).then(function(){
+      setTimeout(function(){ btn.disabled = false; btn.textContent = antes; }, 1600);
+      statusNuvem();
+    });
+  }
+
+  $('btnNuvem').addEventListener('click', function(){
+    var c = cfgNuvem(), s = sessao();
+    $('nvUrl').value = c.url || '';
+    $('nvKey').value = c.key || '';
+    if(s && s.email) $('nvEmail').value = s.email;
+    statusNuvem();
+    $('dlgNuvem').showModal();
+  });
+  $('nvEntrar').addEventListener('click', function(){
+    salvaCfgDaTela();
+    comBotao(this, 'Entrando…', entrar($('nvEmail').value.trim(), $('nvSenha').value)
+      .then(function(){ $('nvSenha').value = ''; return sincronizar(); }));
+  });
+  $('nvCriar').addEventListener('click', function(){
+    salvaCfgDaTela();
+    comBotao(this, 'Criando…', criarConta($('nvEmail').value.trim(), $('nvSenha').value)
+      .then(function(){ $('nvSenha').value = ''; return sessao() ? enviarTudo() : null; }));
+  });
+  $('nvSair').addEventListener('click', function(){
+    setSessao(null);
+    store('p3d.marcaAgua', '1970-01-01T00:00:00Z');
+    statusNuvem();
+  });
+  $('nvSync').addEventListener('click', function(){ comBotao(this, 'Sincronizando…', sincronizar()); });
+  $('nvEnviarTudo').addEventListener('click', function(){ comBotao(this, 'Enviando…', enviarTudo()); });
+  window.addEventListener('online', function(){ luzNuvem(); agendaSync(); });
+  window.addEventListener('offline', luzNuvem);
+
+  /* --- liga os salvamentos locais ao carimbo --- */
+  var _setPedidos = setPedidos;
+  setPedidos = function(a){
+    if(!aplicandoRemoto) carimbaLista('pedido', a, pedidos());
+    _setPedidos(a);
+  };
+
+  var _setEstoque = setEstoque;
+  setEstoque = function(a, redesenha){
+    (a||[]).forEach(function(x){ if(x && !x.id) x.id = novoId('r'); });
+    if(!aplicandoRemoto) carimbaLista('rolo', a, estoque());
+    _setEstoque(a, redesenha);
+  };
+
+  var _setCatalogo = setCatalogo;
+  setCatalogo = function(a, redesenha){
+    if(!aplicandoRemoto) marca('catalogo', 'doc');
+    _setCatalogo(a, redesenha);
+  };
+
+  var _setLib = setLib;
+  setLib = function(a){
+    if(!aplicandoRemoto) marca('peca', 'doc');
+    _setLib(a);
+  };
+
+  var _imgSalva = imgSalva;
+  imgSalva = function(k, v){
+    if(!aplicandoRemoto) marca('imagem', k);
+    return _imgSalva(k, v);
+  };
+
+  var estadoAnterior = null;
+  var _salvaEstado = salvaEstado;
+  salvaEstado = function(){
+    var s = JSON.stringify(estado());
+    if(!aplicandoRemoto && estadoAnterior !== null && s !== estadoAnterior) marca('config', 'doc');
+    estadoAnterior = s;
+    _salvaEstado();
+  };
+
   /* ---------- app instalável ----------
      Só funciona servido por http(s): abrindo o arquivo direto (file://) o
      navegador não permite service worker, e aí é uma página comum. */
@@ -3316,6 +3759,10 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
   renderEstoque();
   renderAvisos();
   trocaAba(load('p3d.aba') || 'calc');
-  imgCarregaTudo().then(renderCatalogo);
+  imgCarregaTudo().then(function(){
+    renderCatalogo();
+    luzNuvem();
+    if(prontoParaSync()) sincronizar().catch(function(){});
+  });
 })();
 </script>

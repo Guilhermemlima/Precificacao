@@ -2,6 +2,32 @@
 
 Calculadora de precificação para impressão 3D sob encomenda. Página única em HTML, sem dependências e sem build: baixe `index.html` e abra no navegador, ou publique a pasta em qualquer hospedagem estática (Vercel, Netlify, GitHub Pages) sem nenhuma configuração.
 
+## Sincronização na nuvem (opcional)
+
+O app funciona sozinho, sem conta. Ligando a nuvem, os dados passam a existir também num Postgres no Supabase, e celular e computador enxergam os mesmos pedidos.
+
+**Desenho local-first:** o navegador continua sendo o armazenamento de trabalho — o app abre e funciona sem internet, e a sincronização acontece por trás. Nada depende de estar online.
+
+### Como ligar
+
+1. Crie um projeto gratuito no Supabase.
+2. No **SQL Editor**, rode o arquivo [`supabase-schema.sql`](supabase-schema.sql). Ele cria a tabela, as regras de acesso por usuário e as views de consulta.
+3. No app, botão **Nuvem** → cole a **URL do projeto** e a **chave anon** (Project Settings → API), crie a conta e entre.
+4. No primeiro aparelho, use **Enviar tudo deste aparelho** para subir o que já existe.
+
+A chave anon é feita para ficar no navegador; quem protege os dados é o Row Level Security, que amarra cada linha ao `auth.uid()` do dono. Ela fica salva só no seu aparelho — não vai para o repositório.
+
+### Como a sincronização funciona
+
+- **Sem biblioteca**: fala direto com a API REST do Supabase por `fetch`, mantendo o arquivo único e o funcionamento offline.
+- **Granularidade**: pedidos, rolos de filamento e imagens sincronizam registro a registro; catálogo, configurações e peças salvas vão como documento inteiro, por mudarem pouco e quase sempre num aparelho só.
+- **Conflito**: vence a alteração mais recente.
+- **Exclusões** viram lápides, removidas só quando o servidor confirma.
+- **Relógio**: depois de gravar, o app adota a hora do servidor como carimbo. Sem isso, um aparelho adiantado reenviaria os mesmos registros para sempre.
+- **Eco**: o que acaba de chegar do servidor não volta a subir no mesmo ciclo.
+
+As views `meus_pedidos`, `meu_estoque` e `receita_mensal` expõem tudo em colunas SQL comuns, para consultar direto no Supabase.
+
 ## App instalável (PWA)
 
 Servido por HTTPS, instala na tela inicial e abre em tela cheia, sem barra de navegador:
