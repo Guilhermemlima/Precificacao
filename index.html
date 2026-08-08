@@ -3397,6 +3397,10 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   function traduzErro(msg, corpo){
     var m = String(msg || '').toLowerCase();
     var cod = (corpo && (corpo.error_code || corpo.code)) || '';
+    if(m.indexOf('email logins are disabled') > -1 || m.indexOf('email signups are disabled') > -1 || cod === 'email_provider_disabled')
+      return 'O login por e-mail está desligado no projeto. Em Authentication → Sign In / Providers → Email, ligue a chave do provedor Email (a de cima) e deixe desmarcada só a opção Confirm email.';
+    if(m.indexOf('signups not allowed') > -1 || cod === 'signup_disabled')
+      return 'Criação de contas desativada no projeto. Ligue em Authentication → Sign In / Providers → Email → Allow new users to sign up.';
     if(m.indexOf('email not confirmed') > -1 || cod === 'email_not_confirmed')
       return 'E-mail ainda não confirmado. Abra o link que o Supabase enviou para você, ou desligue a confirmação em Authentication → Sign In / Providers → Email.';
     if(m.indexOf('invalid login credentials') > -1)
@@ -3628,7 +3632,8 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     if(!c.url || !c.key) linhas.push('<div class="l">Falta informar a URL e a chave do projeto.</div>');
     else linhas.push('<div class="l"><span class="ok">✓</span> Projeto configurado.</div>');
 
-    if(s && s.email) linhas.push('<div class="l"><span class="ok">✓</span> Conectado como <b>' + escapa(s.email) + '</b>.</div>');
+    // O que vale como "conectado" é ter sessão; o e-mail pode não vir na resposta.
+    if(s && s.refresh_token) linhas.push('<div class="l"><span class="ok">✓</span> Conectado' + (s.email ? ' como <b>' + escapa(s.email) + '</b>' : '') + '.</div>');
     else linhas.push('<div class="l">Sem login neste aparelho.</div>');
 
     var q = load('p3d.syncEm');
