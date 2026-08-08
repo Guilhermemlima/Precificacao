@@ -2000,35 +2000,9 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
   $('btnRegistrar').addEventListener('click', function(){ registraPedido(this, 'Registrar como pedido'); });
 
   /* ---------- gerador de descrição ----------
-     Não é IA e não enxerga o personagem: o que ele sabe do produto vem do
-     nome que você digitou e da categoria. Da foto sai só a paleta de cores,
-     pelo mesmo motor da aba de estoque. O resto é redação com variações. */
-
-  function coresDaImagem(dataURI, cb){
-    if(!dataURI) return cb([]);
-    var im = new Image();
-    im.onerror = function(){ cb([]); };
-    im.onload = function(){
-      var guarda = cvAmostra;
-      var am = amostraPixels(im, true);
-      cvAmostra = guarda;
-      if(am.pts.length < 60) return cb([]);
-      var grupos = limpaGrupos(kmeans(am.pts, melhorK(am.pts)), am.pts.length, true);
-      var baldes = grupos.map(function(){ return []; });
-      am.pts.forEach(function(p){
-        var b = 0, dm = Infinity;
-        grupos.forEach(function(g, i){ var d = dW(p, g.lab); if(d < dm){ dm = d; b = i; } });
-        baldes[b].push(p);
-      });
-      cb(grupos.map(function(g, i){
-        return { lab: baldes[i].length ? corRepresentativa(baldes[i]) : g.lab,
-                 pct: baldes[i].length/am.pts.length };
-      }).filter(function(c){ return c.pct >= 0.06; })
-        .sort(function(a,b){ return b.pct-a.pct; })
-        .slice(0,4));
-    };
-    im.src = dataURI;
-  }
+     Não é IA e não enxerga o personagem: o que ele sabe vem do nome que você
+     digitou, do tema da categoria e dos tamanhos cadastrados. O resto é
+     redação com variações. */
 
   function temaCategoria(nomeCat){
     var s = (nomeCat||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
@@ -2068,27 +2042,28 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
             '{n} feito sob medida, do tipo que ninguém mais tem igual.',
             '{n} para resolver aquele canto que estava pedindo alguma coisa.']
   };
-  var CORPO_COR = [
-    'Impresso em PLA {c} — a cor vem do próprio filamento, sem tinta e sem adesivo.',
-    'Sai em {c}, tudo em impressão multicor, com acabamento fosco.',
-    'Feito em {c}, camada por camada, com acabamento fosco.'
+  var CORPO = [
+    'Impresso em PLA com acabamento fosco, feito camada por camada aqui no ateliê.',
+    'Feito em PLA de boa qualidade, com acabamento caprichado e base inclusa.',
+    'Impressão em PLA sob encomenda — pequenas variações e linhas de camada fazem parte do processo.',
+    'Produzido uma peça por vez, em PLA, com acabamento fosco e base inclusa.'
   ];
-  var CORPO_SEM = [
-    'Impresso em PLA com acabamento fosco, camada por camada.',
-    'Feito em PLA de boa qualidade, com acabamento fosco e base inclusa.',
-    'Impressão em PLA, com o acabamento ajustado peça por peça.'
-  ];
-  var TAMANHOS = [
+  var TAMANHOS_UM = [
     'Disponível em {t}.',
-    'Sai em {t} — o tamanho muda o preço, o capricho não.',
-    'Escolha o tamanho: {t}.'
+    'Sai em {t}.',
+    'Feito em {t}.'
   ];
-  var FECHOS = [
-    'Peça decorativa: ótima na estante, péssima como brinquedo.',
-    'Vai bem em estante, mesa de trabalho ou de presente para quem já tem tudo.',
-    'Pequenas variações de cor e linhas de camada fazem parte do processo — é impressão 3D, não peça injetada.',
-    'Feita uma por vez, então cada peça sai com um pouquinho de personalidade própria.',
-    'Se perguntarem se foi comprada pronta, o silêncio é uma resposta aceitável.'
+  var TAMANHOS_VARIOS = [
+    'Disponível nas variações de {t}.',
+    'Sai nas variações de {t} — o tamanho muda o preço, o capricho não.',
+    'Escolha entre {t}.',
+    'Disponível em {t}.'
+  ];
+  var CONVITES = [
+    'Caso deseje outro tamanho, entre em contato e faça seu orçamento.',
+    'Precisa de outra medida? Fale com a gente e monte seu orçamento.',
+    'Quer em um tamanho diferente dos que estão aqui? É só chamar que fazemos um orçamento sob medida.',
+    'Se quiser outro tamanho, entre em contato — a gente faz o orçamento sem compromisso.'
   ];
 
   function embaralha(txt, giro){
@@ -2102,26 +2077,37 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
     return itens.slice(0,-1).join(', ') + ' e ' + itens[itens.length-1];
   }
 
-  function geraDescricao(prod, cat, cores, giro){
+  // "15 cm, 20 cm e 25 cm" fica repetitivo: quando a unidade é a mesma em
+  // todos, ela aparece só no final — "15, 20 e 25 cm".
+  function listaTamanhos(tams){
+    var un = null, iguais = tams.every(function(t){
+      var m = t.match(/^\s*([\d.,]+)\s*(.*)$/);
+      if(!m || !m[2]) return false;
+      if(un === null) un = m[2];
+      return m[2].toLowerCase() === un.toLowerCase();
+    });
+    if(iguais && un && tams.length > 1){
+      return lista(tams.map(function(t){ return t.match(/^\s*([\d.,]+)/)[1]; })) + ' ' + un;
+    }
+    return lista(tams);
+  }
+
+  function geraDescricao(prod, cat, giro){
     var nome = (prod.nome||'').trim() || 'Esta peça';
     var s = embaralha(nome + '|' + (cat.nome||''), giro);
     var partes = [];
 
     partes.push(pega(GANCHOS[temaCategoria(cat.nome)] || GANCHOS.geral, s).replace('{n}', nome));
-
-    var nomes = cores.map(function(c){
-      var rgb = hexRgb(oklabHex(c.lab));
-      return nomeCor(rgb[0], rgb[1], rgb[2]).toLowerCase();
-    }).filter(function(v, i, a){ return a.indexOf(v) === i; });
-    partes.push(nomes.length
-      ? pega(CORPO_COR, s+1).replace('{c}', lista(nomes))
-      : pega(CORPO_SEM, s+1));
+    partes.push(pega(CORPO, s+1));
 
     var tams = (prod.vars||[]).map(function(v){ return (v.t||'').trim(); })
       .filter(function(t, i, a){ return t && a.indexOf(t) === i; });
-    if(tams.length > 1) partes.push(pega(TAMANHOS, s+2).replace('{t}', lista(tams)));
+    if(tams.length){
+      partes.push(pega(tams.length > 1 ? TAMANHOS_VARIOS : TAMANHOS_UM, s+2)
+        .replace('{t}', listaTamanhos(tams)));
+    }
 
-    partes.push(pega(FECHOS, s+3));
+    partes.push(pega(CONVITES, s+3));
     return partes.join(' ');
   }
 
@@ -2203,7 +2189,7 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
             '<textarea rows="3" data-c="'+ci+'" data-p="'+pi+'" data-f="desc" placeholder="Descrição: material, acabamento, base inclusa… ou gere uma abaixo.">'+escapa(p.desc||'')+'</textarea>' +
             '<div style="display:flex; gap:7px; align-items:center; flex-wrap:wrap">' +
               '<button class="btn tiny" data-gera='+alvo+' type="button">' + (p.desc ? 'Gerar outra descrição' : 'Gerar descrição') + '</button>' +
-              '<span class="sub">usa o nome, a categoria e as cores da foto</span>' +
+              '<span class="sub">usa o nome, a categoria e os tamanhos cadastrados</span>' +
             '</div>' +
             '<select data-c="'+ci+'" data-p="'+pi+'" data-f="modo">' +
               Object.keys(MODOS).map(function(k){ return '<option value="'+k+'"'+(p.modo===k?' selected':'')+'>'+MODOS[k]+'</option>'; }).join('') +
@@ -2328,15 +2314,9 @@ tr.baixo td{background:color-mix(in srgb, var(--warn) 10%, transparent)}
         setTimeout(function(){ el.textContent = 'Gerar descrição'; }, 2200);
         return;
       }
-      el.textContent = 'Escrevendo…';
       giros[pGera.id] = (giros[pGera.id] || 0) + 1;
-      coresDaImagem(img('p:' + pGera.id), function(cores){
-        var atual = catalogo();
-        var alvoP = atual[ix[0]] && atual[ix[0]].produtos[ix[1]];
-        if(!alvoP) return;
-        alvoP.desc = geraDescricao(alvoP, atual[ix[0]], cores, giros[alvoP.id]);
-        setCatalogo(atual);
-      });
+      pGera.desc = geraDescricao(pGera, cGera, giros[pGera.id]);
+      setCatalogo(cats);
       return;
     }
 

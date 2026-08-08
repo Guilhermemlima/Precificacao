@@ -95,9 +95,16 @@ O botão gera um PDF de várias páginas: capa com sua logo, uma página por cat
 
 ### Descrição automática
 
-Cada produto tem um botão que escreve a descrição sozinho. **Não é IA e não enxerga o personagem:** o que ele sabe do produto vem do nome digitado e do nome da categoria; da foto sai só a paleta de cores, pelo mesmo motor da aba de estoque.
+Cada produto tem um botão que escreve a descrição sozinho. **Não é IA e não enxerga o personagem:** o que ele sabe vem do nome digitado, do nome da categoria e dos tamanhos cadastrados.
 
-O texto monta quatro partes — gancho, corpo técnico com as cores detectadas, linha de tamanhos e fecho — a partir de bancos de frases. O gancho muda conforme o tema da categoria (anime, games, heróis, carros, desenho, terror, decoração). A escolha vem de um hash do nome do produto, então cada peça recebe um texto diferente; apertar de novo gira para outra variação.
+O texto monta quatro partes a partir de bancos de frases:
+
+1. **Gancho** — muda conforme o tema da categoria (anime, games, heróis, carros, desenho, terror, decoração).
+2. **Corpo técnico** — material e acabamento.
+3. **Tamanhos** — quando todos compartilham a unidade, ela aparece uma vez só: `15 cm, 20 cm e 25 cm` vira `15, 20 e 25 cm`. Unidades diferentes são mantidas como estão.
+4. **Convite ao orçamento** — para quem quer um tamanho fora da tabela.
+
+A escolha vem de um hash do nome do produto, então cada peça recebe um texto diferente; apertar de novo gira para outra variação.
 
 Produtos se movem entre categorias e sobem/descem dentro delas. Duplicar oferece dois modos:
 
