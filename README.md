@@ -100,7 +100,7 @@ Cada produto tem um botão que escreve a descrição sozinho. **Não é IA e nã
 O texto monta quatro partes a partir de bancos de frases:
 
 1. **Gancho** — muda conforme o tema da categoria (anime, games, heróis, carros, desenho, terror, decoração).
-2. **Corpo técnico** — material e acabamento.
+2. **Corpo técnico** — material e acabamento, em tom afirmativo. Nada de ressalva sobre linhas de camada ou variações do processo: catálogo é peça de venda, e o lugar de alinhar expectativa é o campo de observações do orçamento.
 3. **Tamanhos** — quando todos compartilham a unidade, ela aparece uma vez só: `15 cm, 20 cm e 25 cm` vira `15, 20 e 25 cm`. Unidades diferentes são mantidas como estão.
 4. **Convite ao orçamento** — para quem quer um tamanho fora da tabela.
 
