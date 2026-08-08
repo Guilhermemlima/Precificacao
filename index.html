@@ -314,6 +314,11 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
 .var-l input.t{flex:1; min-width:0}
 .var-l input.p{width:110px; flex:none; font-family:var(--font-mono); text-align:right}
 .preco-lab{font-family:var(--font-mono); font-size:12.5px; color:var(--accent); font-weight:700; white-space:nowrap}
+.prod-acts{display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:3px; padding-top:8px; border-top:1px solid var(--line)}
+.prod-acts .st{font-size:12px; padding:4px 7px}
+.prod-ed.vinc{border-style:dashed; background:transparent}
+.prod-ed.vinc .prod-foto{cursor:default; opacity:.75}
+.prod-foto.sem{cursor:default}
 .linha-topo{display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:space-between}
 
 /* ---------- folha de catálogo (só na impressão / PDF) ---------- */
@@ -1434,6 +1439,29 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
   }
   function novoId(p){ return p + Date.now().toString(36) + Math.random().toString(36).slice(2,5); }
 
+  function achaProduto(cats, id){
+    for(var i = 0; i < cats.length; i++){
+      var ps = cats[i].produtos || [];
+      for(var j = 0; j < ps.length; j++){
+        if(ps[j].id === id) return {cat:cats[i], prod:ps[j], ci:i, pi:j};
+      }
+    }
+    return null;
+  }
+  // Cópia vinculada guarda só o id do original; nome, preços e foto vêm de lá.
+  function resolve(cats, p){
+    if(!p.link) return {d:p, chave:'p:' + p.id, origem:null};
+    var o = achaProduto(cats, p.link);
+    return o ? {d:o.prod, chave:'p:' + o.prod.id, origem:o.cat} : {d:p, chave:'p:' + p.id, origem:null};
+  }
+  function clone(p, cats){
+    var base = resolve(cats, p).d;
+    return {
+      id: novoId('p'), nome: base.nome, desc: base.desc, modo: base.modo,
+      vars: (base.vars||[]).map(function(v){ return {t:v.t, p:v.p}; })
+    };
+  }
+
   function precoDe(prod){
     var ps = (prod.vars||[]).map(function(v){ return parseNum(v.p); }).filter(function(n){ return n > 0; });
     if(prod.modo === 'consulta' || !ps.length) return {txt:'Sob consulta', v:0};
@@ -1858,9 +1886,49 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
 
     $('listaCat').innerHTML = cats.map(function(c, ci){
       var capa = img('c:' + c.id);
+      var nProds = (c.produtos||[]).length;
       var prods = (c.produtos||[]).map(function(p, pi){
-        var foto = img('p:' + p.id);
-        var pr = precoDe(p);
+        var rs = resolve(cats, p);
+        var foto = img(rs.chave);
+        var pr = precoDe(rs.d);
+        var alvo = '"'+ci+'.'+pi+'"';
+
+        // Ações comuns a produto próprio e cópia vinculada.
+        var opcoesMover = cats.map(function(o, oi){
+          return oi === ci ? '' : '<option value="'+oi+'">'+escapa(o.nome || 'Categoria '+(oi+1))+'</option>';
+        }).join('');
+        var acoes = '<div class="prod-acts">' +
+          '<button class="btn tiny ghost" data-sobep='+alvo+' type="button"'+(pi===0?' disabled':'')+' title="Subir">↑</button>' +
+          '<button class="btn tiny ghost" data-descep='+alvo+' type="button"'+(pi===nProds-1?' disabled':'')+' title="Descer">↓</button>' +
+          (opcoesMover
+            ? '<select class="st" data-mv='+alvo+'><option value="">Mover para…</option>'+opcoesMover+'</select>'
+            : '') +
+          '<select class="st" data-dup='+alvo+'>' +
+            '<option value="">Duplicar em…</option>' +
+            '<optgroup label="Cópia independente (preços separados)">' +
+              cats.map(function(o, oi){ return '<option value="i:'+oi+'">'+escapa(o.nome || 'Categoria '+(oi+1))+(oi===ci?' (aqui mesmo)':'')+'</option>'; }).join('') +
+            '</optgroup>' +
+            '<optgroup label="Cópia vinculada (edita num lugar só)">' +
+              cats.map(function(o, oi){ return oi === ci ? '' : '<option value="v:'+oi+'">'+escapa(o.nome || 'Categoria '+(oi+1))+'</option>'; }).join('') +
+            '</optgroup>' +
+          '</select>' +
+          '<button class="btn tiny ghost" data-rmprod='+alvo+' type="button">Excluir</button>' +
+        '</div>';
+
+        if(p.link){
+          return '<div class="prod-ed vinc">' +
+            '<div class="prod-foto sem">' + (foto ? '<img src="'+foto+'" alt="">' : 'Sem foto') + '</div>' +
+            '<div class="prod-campos">' +
+              '<div class="linha-topo">' +
+                '<b style="flex:1;min-width:140px">' + escapa(rs.d.nome || 'Produto') + '</b>' +
+                '<span class="preco-lab">'+pr.txt+'</span>' +
+              '</div>' +
+              '<div class="sub">Cópia vinculada' + (rs.origem ? ' de <b>' + escapa(rs.origem.nome || 'outra categoria') + '</b>' : '') +
+              ' — altere lá e muda aqui junto.</div>' +
+              acoes +
+            '</div></div>';
+        }
+
         var vars = (p.vars||[]).map(function(v, vi){
           return '<div class="var-l">' +
             '<input type="text" class="t" data-c="'+ci+'" data-p="'+pi+'" data-v="'+vi+'" data-f="t" value="'+escapa(v.t)+'" placeholder="15 cm">' +
@@ -1868,19 +1936,19 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
             '<button class="btn tiny ghost" data-rmvar="'+ci+'.'+pi+'.'+vi+'" type="button">×</button></div>';
         }).join('');
         return '<div class="prod-ed">' +
-          '<div class="prod-foto" data-foto="'+ci+'.'+pi+'">' + (foto ? '<img src="'+foto+'" alt="">' : 'Foto do produto') + '</div>' +
+          '<div class="prod-foto" data-foto='+alvo+'>' + (foto ? '<img src="'+foto+'" alt="">' : 'Foto do produto') + '</div>' +
           '<div class="prod-campos">' +
             '<div class="linha-topo">' +
               '<input type="text" data-c="'+ci+'" data-p="'+pi+'" data-f="nome" value="'+escapa(p.nome)+'" placeholder="Nome do produto" style="flex:1;min-width:140px">' +
               '<span class="preco-lab" id="pl-'+ci+'-'+pi+'">'+pr.txt+'</span>' +
-              '<button class="btn tiny ghost" data-rmprod="'+ci+'.'+pi+'" type="button">Excluir</button>' +
             '</div>' +
             '<input type="text" data-c="'+ci+'" data-p="'+pi+'" data-f="desc" value="'+escapa(p.desc||'')+'" placeholder="Descrição curta: material, acabamento, base inclusa…">' +
             '<select data-c="'+ci+'" data-p="'+pi+'" data-f="modo">' +
               Object.keys(MODOS).map(function(k){ return '<option value="'+k+'"'+(p.modo===k?' selected':'')+'>'+MODOS[k]+'</option>'; }).join('') +
             '</select>' +
             '<div class="vars">' + vars + '</div>' +
-            '<button class="btn tiny" data-addvar="'+ci+'.'+pi+'" type="button" style="align-self:flex-start">+ Tamanho</button>' +
+            '<button class="btn tiny" data-addvar='+alvo+' type="button" style="align-self:flex-start">+ Tamanho</button>' +
+            acoes +
           '</div></div>';
       }).join('');
 
@@ -1929,7 +1997,43 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
   $('listaCat').addEventListener('change', function(e){
     var el = e.target;
     if(el.tagName !== 'SELECT') return;
-    var cats = catalogo(), c = cats[el.dataset.c];
+    var cats = catalogo(), ix;
+
+    // Mover para outra categoria
+    if(el.dataset.mv !== undefined){
+      if(!el.value){ return; }
+      ix = el.dataset.mv.split('.');
+      var destino = cats[+el.value];
+      if(!destino) return;
+      destino.produtos = destino.produtos || [];
+      destino.produtos.push(cats[ix[0]].produtos.splice(ix[1], 1)[0]);
+      setCatalogo(cats);
+      return;
+    }
+
+    // Duplicar: "i:<ci>" cópia independente, "v:<ci>" cópia vinculada
+    if(el.dataset.dup !== undefined){
+      if(!el.value){ return; }
+      ix = el.dataset.dup.split('.');
+      var tipo = el.value.charAt(0), dest = cats[+el.value.slice(2)];
+      var orig = cats[ix[0]].produtos[ix[1]];
+      if(!dest || !orig) return;
+      dest.produtos = dest.produtos || [];
+      if(tipo === 'v'){
+        // Vincula sempre ao original de verdade, nunca a outra cópia.
+        dest.produtos.push({id:novoId('p'), link: orig.link || orig.id});
+      } else {
+        var copia = clone(orig, cats);
+        dest.produtos.push(copia);
+        var origem = img(resolve(cats, orig).chave);
+        if(origem) imgSalva('p:' + copia.id, origem);
+      }
+      setCatalogo(cats);
+      return;
+    }
+
+    if(!el.dataset.f) return;
+    var c = cats[el.dataset.c];
     if(!c) return;
     if(el.dataset.p !== undefined) c.produtos[el.dataset.p][el.dataset.f] = el.value;
     else c[el.dataset.f] = el.value;
@@ -1948,9 +2052,27 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
 
   var alvoImagem = null;
   $('listaCat').addEventListener('click', function(e){
-    var el = e.target.closest('[data-capa],[data-foto],[data-addprod],[data-rmcat],[data-rmprod],[data-addvar],[data-rmvar],[data-sobe],[data-desce]');
+    var el = e.target.closest('[data-capa],[data-foto],[data-addprod],[data-rmcat],[data-rmprod],[data-addvar],[data-rmvar],[data-sobe],[data-desce],[data-sobep],[data-descep]');
     if(!el) return;
     var d = el.dataset, cats = catalogo(), ix;
+
+    // Antes de apagar um original, transforma suas cópias vinculadas em cópias
+    // independentes — senão elas ficariam apontando para o nada.
+    function materializaLinks(orig){
+      if(orig.link) return;
+      var dados = img('p:' + orig.id);
+      cats.forEach(function(cc){
+        (cc.produtos||[]).forEach(function(pp, k){
+          if(pp.link === orig.id){
+            var novo = clone(orig, cats);
+            novo.id = pp.id;
+            cc.produtos[k] = novo;
+            if(dados) imgSalva('p:' + novo.id, dados);
+          }
+        });
+      });
+      imgSalva('p:' + orig.id, '');
+    }
 
     if(d.capa !== undefined || d.foto !== undefined){
       var alvo = d.capa !== undefined ? d.capa : d.foto;
@@ -1969,13 +2091,23 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
     if(d.rmcat !== undefined){
       var c = cats[d.rmcat];
       imgSalva('c:' + c.id, '');
-      (c.produtos||[]).forEach(function(p){ imgSalva('p:' + p.id, ''); });
+      (c.produtos||[]).forEach(materializaLinks);
       cats.splice(d.rmcat, 1);
     }
     if(d.rmprod !== undefined){
       ix = d.rmprod.split('.');
-      imgSalva('p:' + cats[ix[0]].produtos[ix[1]].id, '');
+      materializaLinks(cats[ix[0]].produtos[ix[1]]);
       cats[ix[0]].produtos.splice(ix[1], 1);
+    }
+    if(d.sobep !== undefined){
+      ix = d.sobep.split('.');
+      var lp = cats[ix[0]].produtos, j = +ix[1];
+      if(j > 0) lp.splice(j-1, 0, lp.splice(j,1)[0]);
+    }
+    if(d.descep !== undefined){
+      ix = d.descep.split('.');
+      var lq = cats[ix[0]].produtos, k2 = +ix[1];
+      if(k2 < lq.length-1) lq.splice(k2+1, 0, lq.splice(k2,1)[0]);
     }
     if(d.addvar !== undefined){
       ix = d.addvar.split('.');
@@ -2012,7 +2144,8 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
 
   /* ---------- catálogo em PDF ---------- */
   $('btnCatPDF').addEventListener('click', function(){
-    var cats = catalogo().filter(function(c){ return (c.produtos||[]).length; });
+    var todosCats = catalogo();
+    var cats = todosCats.filter(function(c){ return (c.produtos||[]).length; });
     if(!cats.length){
       var b = $('btnCatPDF'); b.textContent = 'Cadastre ao menos um produto';
       setTimeout(function(){ b.textContent = 'Gerar catálogo em PDF'; }, 2400);
@@ -2042,8 +2175,9 @@ footer.foot{max-width:1320px; margin:26px auto 0; padding:0 20px; color:var(--mu
         '<div class="cnt">' + c.produtos.length + ' modelo' + (c.produtos.length === 1 ? '' : 's') + '</div></div></div>' +
         '<div class="cat-rule"></div>';
 
-      var prods = c.produtos.map(function(p){
-        var foto = img('p:' + p.id);
+      var prods = c.produtos.map(function(pRaw){
+        var rs = resolve(todosCats, pRaw), p = rs.d;
+        var foto = img(rs.chave);
         var pr = precoDe(p);
         var tams = (p.vars||[]).filter(function(v){ return v.t || parseNum(v.p) > 0; });
         var lista = p.modo === 'consulta' ? '' : tams.map(function(v){

@@ -69,6 +69,13 @@ Terceira aba. Categorias livres (Anime, Games, Marvel, DC, Carros…), cada uma 
 
 O botão gera um PDF de várias páginas: capa com sua logo, uma página por categoria com os produtos em grade de duas colunas, e uma página final de condições.
 
+Produtos se movem entre categorias e sobem/descem dentro delas. Duplicar oferece dois modos:
+
+- **Cópia independente** — vira outro produto, com preços e descrição próprios.
+- **Cópia vinculada** — o mesmo produto aparecendo em duas categorias; nome, preços e foto vêm do original, então editar num lugar muda nos dois.
+
+Apagar um original que tem cópias vinculadas não deixa nada órfão: as cópias são materializadas como produtos independentes, com os dados preservados, antes da exclusão.
+
 As imagens do catálogo ficam em **IndexedDB**, não no `localStorage` — dezenas de fotos passam muito dos ~5 MB que o `localStorage` oferece. Textos e preços continuam no `localStorage`. O backup JSON leva as duas coisas.
 
 ## O orçamento em PDF
