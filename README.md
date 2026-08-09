@@ -160,14 +160,18 @@ O botão gera um PDF de várias páginas: capa com sua logo, uma página por cat
 
 Cada produto tem um botão que escreve a descrição sozinho. **Não é IA e não enxerga o personagem:** o que ele sabe vem do nome digitado, do nome da categoria e dos tamanhos cadastrados.
 
-O texto monta quatro partes a partir de bancos de frases:
+Além de nome e tamanhos, cada produto tem três campos que alimentam o texto: **universo/jogo**, **estilo** (25 opções) e **características**.
 
-1. **Gancho** — muda conforme o tema detectado no nome da categoria. São 14 temas (anime, games, heróis, carros, desenhos, terror, ficção científica, RPG, pets, esporte, presentes, colecionáveis, decoração e genérico), com 6 aberturas cada.
-2. **Corpo técnico** — material e acabamento, em tom afirmativo. Nada de ressalva sobre linhas de camada ou variações do processo: catálogo é peça de venda, e o lugar de alinhar expectativa é o campo de observações do orçamento.
-3. **Tamanhos** — quando todos compartilham a unidade, ela aparece uma vez só: `15 cm, 20 cm e 25 cm` vira `15, 20 e 25 cm`. Unidades diferentes são mantidas como estão.
-4. **Convite ao orçamento** — para quem quer um tamanho fora da tabela.
+O texto monta até seis partes a partir de bancos de frases:
 
-A escolha vem de um hash do nome do produto, então cada peça recebe um texto diferente; apertar de novo gira para outra variação.
+1. **Abertura** — quatro bancos de 25 frases cada, escolhidos pelo que existe no produto: por *universo/jogo* quando preenchido, por *adaptação* quando a categoria é de releituras, por *personagem* no caso geral, e um repertório temático próprio para categorias que não falam de personagem (decoração, pets, carros, esporte).
+2. **Estilo** — uma frase específica para cada um dos 25 estilos.
+3. **Material e características** — em tom afirmativo. Sem ressalva sobre linhas de camada: catálogo é peça de venda, e o lugar de alinhar expectativa é o campo de observações do orçamento.
+4. **Tamanhos** — quando todos compartilham a unidade, ela aparece uma vez só: `15 cm, 20 cm e 25 cm` vira `15, 20 e 25 cm`.
+5. **Complemento** — 25 frases curtas, usadas só quando não houve frase de estilo, que cumpre o mesmo papel.
+6. **Convite ao orçamento** — para quem quer um tamanho fora da tabela.
+
+As frases usam variáveis `{{nome}}`, `{{jogo}}`, `{{estilo}}`, `{{caracteristicas}}` e outras; frase cujo campo esteja vazio é descartada na escolha, então nunca sai texto com lacuna. A seleção vem de um hash do nome do produto — cada peça recebe um texto diferente, e apertar de novo gira para outra variação.
 
 Produtos se movem entre categorias e sobem/descem dentro delas. Duplicar oferece dois modos:
 

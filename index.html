@@ -2198,6 +2198,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     if(/terror|horror|halloween|assombr|monstro|zumbi|caveira|skull/.test(s)) return 'terror';
     // Termos curtos exigem palavra inteira: sem isso "colecionaveis" casava
     // com "nave" e caía no tema errado.
+    if(/adapta|versao|versoes|releitura|alternativ|crossover|mashup/.test(s)) return 'adaptacao';
     if(/colecion|action ?figure|\bbustos?\b|estatu|\bfigures?\b/.test(s)) return 'colecionavel';
     if(/star ?wars|sci-?fi|espacial|\bespaco\b|\brobos?\b|mecha|\baliens?\b|\bnaves?\b|futurist/.test(s)) return 'scifi';
     if(/\brpg\b|\bdnd\b|d&d|tabletop|\bdados?\b|dragao|\belfos?\b|\borcs?\b|medieval|cavaleiro|fantasia/.test(s)) return 'rpg';
@@ -2207,6 +2208,151 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     if(/vaso|planta|flor|decor|casa|utilit|organiz|suporte|luminaria/.test(s)) return 'decor';
     return 'geral';
   }
+
+  /* Repertório principal, escrito pelo Guilherme. Quatro blocos de 25:
+     abertura por jogo/universo, por personagem, por estilo e por adaptação,
+     mais frases de complemento. As chaves {{...}} são preenchidas com o que
+     estiver cadastrado no produto; frase cujo campo estiver vazio é pulada. */
+  var ABERTURA_JOGO = [
+    'Traga um pouco do universo de {{jogo}} para a sua coleção com {{nome}}, uma peça criada para quem realmente gosta de carregar seus personagens favoritos para além das telas.',
+    'Se {{jogo}} faz parte da sua lista de jogos favoritos, {{nome}} provavelmente merece um espaço especial na sua coleção.',
+    'Direto do universo de {{jogo}}, {{nome}} ganha uma nova forma em uma peça cheia de personalidade, perfeita para fãs e colecionadores.',
+    'Agora você pode ter {{nome}} fora das telas e dentro da sua coleção. Uma peça que transforma um personagem marcante de {{jogo}} em algo que você pode admirar de perto.',
+    'Para quem passou horas explorando o universo de {{jogo}}, nada melhor do que trazer {{nome}} para o mundo real.',
+    '{{nome}} é daqueles personagens que não precisam de muita apresentação. Conhecido por sua presença em {{jogo}}, agora ele pode fazer parte da sua coleção.',
+    'O universo de {{jogo}} acaba de ganhar um espaço na sua estante. Apresentamos {{nome}}, reproduzido em uma peça cheia de detalhes.',
+    'Fãs de {{jogo}} vão reconhecer imediatamente a presença de {{nome}}. Uma peça pensada para transformar um personagem virtual em uma verdadeira peça de coleção.',
+    'Se você conhece {{jogo}}, sabe exatamente por que {{nome}} é tão especial. Agora chegou a hora de colocar esse personagem na sua estante.',
+    'De {{jogo}} diretamente para a sua coleção: {{nome}} chega em uma peça que valoriza cada detalhe do personagem.',
+    '{{nome}} saiu da tela e ganhou espaço no mundo real. Uma peça inspirada em {{jogo}} para deixar sua coleção ainda mais completa.',
+    'Para decorar o setup, a estante ou aquele cantinho especial da coleção, {{nome}} é uma escolha que qualquer fã de {{jogo}} vai reconhecer.',
+    'O universo de {{jogo}} é cheio de personagens memoráveis, e {{nome}} certamente é um deles. Agora você pode ter uma representação dele em sua coleção.',
+    'Se {{jogo}} marcou alguma fase da sua vida, talvez esteja na hora de transformar essa nostalgia em uma peça física. Conheça {{nome}}.',
+    'Mais do que uma miniatura, {{nome}} representa um pedacinho do universo de {{jogo}} que você pode levar para casa.',
+    'Prepare um espaço especial na estante, porque {{nome}} chegou para adicionar personalidade à sua coleção inspirada em {{jogo}}.',
+    '{{nome}} é a escolha perfeita para quem gosta de transformar suas paixões pelos games em itens que podem ser vistos, colecionados e admirados.',
+    'Uma das grandes vantagens de ser fã de {{jogo}} é poder levar seus personagens favoritos para diferentes lugares. Agora {{nome}} pode fazer parte do seu espaço.',
+    'Do controle para a estante. {{nome}}, personagem de {{jogo}}, agora ganha uma versão física cheia de presença.',
+    'Se você é fã de {{jogo}}, provavelmente já imaginou ter seus personagens favoritos em casa. {{nome}} pode tornar essa ideia realidade.',
+    '{{nome}} representa toda a personalidade do universo de {{jogo}} em uma peça feita para chamar atenção na coleção.',
+    'Uma homenagem para quem conhece, gosta e vive o universo de {{jogo}}. {{nome}} chega para conquistar seu espaço na coleção.',
+    'Para jogadores, colecionadores e fãs de cultura geek, {{nome}} é uma forma diferente de transformar uma paixão por {{jogo}} em decoração.',
+    'Não importa quantas horas você passou jogando {{jogo}}: ter {{nome}} na estante é uma experiência completamente diferente.',
+    '{{nome}} traz para o mundo real toda a identidade de {{jogo}} em uma peça pensada para quem gosta de colecionar aquilo que realmente faz parte da sua história.'
+  ];
+
+  var ABERTURA_PERSONAGEM = [
+    'Alguns personagens simplesmente não passam despercebidos. {{nome}} é um deles, e agora pode ganhar um lugar de destaque na sua coleção.',
+    '{{nome}} dispensa apresentações. Sua personalidade e presença fizeram dele um personagem inesquecível, e agora você pode ter uma representação dele em casa.',
+    'Para quem sempre teve aquele personagem favorito, chegou a hora de colocá-lo fora da tela e dentro da coleção. Conheça {{nome}}.',
+    'Herói, vilão ou simplesmente um personagem impossível de esquecer: {{nome}} foi feito para chamar atenção.',
+    '{{nome}} não é apenas mais uma peça. É a representação de um personagem que conquistou fãs e ganhou seu próprio espaço na cultura geek.',
+    'Se {{nome}} é um dos seus personagens favoritos, essa peça foi feita para você.',
+    'Uma peça para quem gosta de personagens com personalidade. {{nome}} chega com presença, detalhes e aquele visual que todo fã reconhece.',
+    'Tem personagem que combina com qualquer coleção. {{nome}} é exatamente esse tipo de peça.',
+    'Coloque {{nome}} na estante e deixe o personagem falar por si. Uma peça cheia de personalidade para fãs e colecionadores.',
+    '{{nome}} ganhou vida fora das telas em uma peça pensada para destacar suas principais características.',
+    'Aquele personagem que você sempre quis ter na coleção agora pode ocupar um lugar especial na sua estante.',
+    '{{nome}} é perfeito para quem gosta de colecionar personagens que marcaram histórias, jogos, filmes e momentos inesquecíveis.',
+    'Entre tantos personagens, alguns acabam se tornando favoritos. {{nome}} certamente merece esse lugar.',
+    'Uma peça feita para quem olha e pensa: “esse personagem precisa estar na minha coleção”.',
+    '{{nome}} combina personalidade, presença e aquele visual que faz qualquer fã reconhecer o personagem de longe.',
+    'Se você já teve {{nome}} como personagem favorito, agora pode ter uma versão dele para chamar de sua.',
+    'Transforme sua paixão por {{nome}} em uma peça que pode ficar na sua mesa, estante ou setup.',
+    '{{nome}} chegou para deixar sua coleção ainda mais interessante, seja ao lado de outros personagens ou como peça principal.',
+    'Uma homenagem a um personagem que conquistou seu espaço. {{nome}} foi pensado para quem valoriza cada detalhe.',
+    '{{nome}} é o tipo de peça que começa uma conversa assim que alguém entra no ambiente.',
+    'Para fãs que não se contentam apenas em assistir ou jogar, {{nome}} traz o personagem para uma experiência completamente diferente.',
+    'Seu personagem favorito merece mais do que aparecer na tela. Dê a {{nome}} um espaço especial na sua coleção.',
+    'Com sua identidade marcante, {{nome}} transforma qualquer espaço em um pequeno pedaço do universo do personagem.',
+    'Se a personalidade de {{nome}} pudesse ser colocada em uma peça, provavelmente seria algo assim: marcante, divertido e impossível de ignorar.',
+    '{{nome}} é uma peça para quem gosta de colecionar histórias, personagens e universos que fazem parte da cultura geek.'
+  ];
+
+  var ABERTURA_ADAPTACAO = [
+    'E se {{nome}} fosse reinventado em outro universo? Essa versão traz uma interpretação diferente do personagem sem perder sua identidade.',
+    'Uma nova maneira de enxergar {{nome}}. Esta adaptação mistura características clássicas com uma proposta completamente diferente.',
+    '{{nome}} ganhou uma nova interpretação e o resultado ficou simplesmente incrível.',
+    'Conheça uma versão alternativa de {{nome}}, criada para quem gosta de ver seus personagens favoritos sob uma nova perspectiva.',
+    'Nem todo personagem precisa seguir o mesmo estilo. Aqui, {{nome}} recebe uma adaptação especial cheia de personalidade.',
+    'O clássico encontra o diferente nesta versão de {{nome}}, criada para fugir do comum e surpreender na coleção.',
+    '{{nome}} como você nunca viu antes. Uma adaptação que mistura referências, criatividade e um visual único.',
+    'Uma releitura de {{nome}} para quem gosta de peças fora do padrão.',
+    'Pegamos a essência de {{nome}} e colocamos em uma nova proposta visual. O resultado é uma peça diferente e cheia de personalidade.',
+    '{{nome}} ganhou uma nova versão especialmente pensada para quem gosta de colecionar modelos únicos.',
+    'Se você achava que já tinha visto todas as versões de {{nome}}, talvez essa adaptação consiga surpreender.',
+    'Uma interpretação diferente, uma nova estética e o mesmo personagem que você conhece. Conheça esta versão de {{nome}}.',
+    '{{nome}} recebeu uma transformação visual que combina perfeitamente com quem procura algo diferente para sua coleção.',
+    'Uma versão alternativa de {{nome}} que prova que personagens conhecidos também podem ganhar novas interpretações.',
+    'Aqui, {{nome}} deixa de lado o visual tradicional e assume uma proposta mais {{estilo}}.',
+    'Imagine {{nome}} dentro de um universo completamente diferente. Essa peça transforma essa ideia em realidade.',
+    '{{nome}} foi reinterpretado com uma nova estética, criando uma peça que mistura familiaridade e novidade.',
+    'Para quem gosta de fugir do óbvio, esta versão de {{nome}} traz uma abordagem diferente e muito mais criativa.',
+    'Uma nova aparência para um personagem conhecido. {{nome}} ganha aqui uma versão pensada para surpreender.',
+    '{{nome}} continua sendo {{nome}}, mas definitivamente não da maneira que você está acostumado a ver.',
+    'Essa versão de {{nome}} mistura elementos clássicos com {{caracteristicas}}, criando uma peça única para colecionadores.',
+    'Quando criatividade e cultura geek se encontram, surgem peças como esta. Conheça a versão {{estilo}} de {{nome}}.',
+    '{{nome}} ganhou uma nova identidade visual nesta adaptação, tornando a peça ainda mais interessante para colecionar.',
+    'Uma releitura feita para quem gosta de personagens conhecidos, mas prefere versões diferentes, criativas e fora do padrão.',
+    'Do conhecido ao inesperado: {{nome}} recebe uma nova interpretação que transforma completamente a experiência de ter esse personagem na coleção.'
+  ];
+
+  // Chaveado pelo estilo escolhido no produto.
+  var ESTILOS = {
+    'Fantasia':      'Entre no universo da fantasia com {{nome}}, uma peça que combina elementos fantásticos, presença e muitos detalhes.',
+    'Dark Fantasy':  'Com uma estética sombria e imponente, {{nome}} é perfeito para quem gosta daquele visual dark fantasy cheio de personalidade.',
+    'Medieval':      'Inspirado no estilo medieval, {{nome}} traz uma estética que parece ter saído diretamente de uma aventura épica.',
+    'Épico':         'Prepare a estante para algo grandioso. {{nome}} foi pensado para transmitir presença e aquela sensação de estar diante de uma verdadeira peça épica.',
+    'Realista':      'Os detalhes fazem toda a diferença. {{nome}} apresenta uma proposta mais realista, valorizando formas, texturas e características do modelo.',
+    'Cute':          'Pequeno no tamanho, mas enorme em carisma. {{nome}} traz uma versão mais fofa e descontraída do personagem.',
+    'Chibi':         'Cabeça grande, corpo pequeno e muito carisma: {{nome}} ganha uma versão chibi perfeita para colecionadores.',
+    'Cartoon':       'Com visual inspirado em animações e desenhos, {{nome}} transforma o personagem em uma peça divertida e cheia de personalidade.',
+    'Colecionável':  '{{nome}} foi pensado para quem gosta de peças colecionáveis que conseguem se destacar mesmo quando colocadas ao lado de outras.',
+    'Premium':       'Uma peça para quem procura algo diferente. {{nome}} combina presença visual e atenção aos detalhes em uma proposta mais premium.',
+    'Minimalista':   'Nem sempre é preciso exagerar para chamar atenção. {{nome}} aposta em uma estética mais limpa e elegante.',
+    'Decorativo':    '{{nome}} pode ser usado para transformar aquele espaço vazio em um ponto de destaque na decoração.',
+    'Geek':          'Para quem vive a cultura geek, {{nome}} é uma maneira divertida de levar suas referências favoritas para dentro de casa.',
+    'Nostálgico':    '{{nome}} traz aquela sensação de nostalgia que faz lembrar personagens, histórias e momentos que ficaram na memória.',
+    'Futurista':     'Com uma estética inspirada no futuro, {{nome}} combina tecnologia, personalidade e um visual diferente para sua coleção.',
+    'Cyberpunk':     'Neon, tecnologia e uma atmosfera urbana: {{nome}} combina perfeitamente com setups e coleções inspiradas no universo cyberpunk.',
+    'Guerreiro':     'Com postura de combate e presença marcante, {{nome}} parece pronto para entrar em uma verdadeira batalha.',
+    'Monstruoso':    'Para quem gosta de criaturas que impressionam, {{nome}} traz um visual poderoso e cheio de personalidade.',
+    'Fantástico':    '{{nome}} parece ter saído diretamente de uma história fantástica e encontrado um lugar na sua coleção.',
+    'Aventureiro':   'Pronto para a próxima aventura? {{nome}} traz toda aquela energia de exploração, descoberta e aventura para sua coleção.',
+    'Sombrio':       'Com uma estética mais sombria, {{nome}} é perfeito para ambientes e coleções que pedem uma peça com mais personalidade.',
+    'Divertido':     '{{nome}} chega com uma proposta leve e divertida, perfeita para quem gosta de peças que arrancam um sorriso.',
+    'Imponente':     'Se a ideia é ter uma peça que chame atenção, {{nome}} entrega presença de sobra.',
+    'Estilizado':    '{{nome}} apresenta uma interpretação estilizada do personagem, misturando identidade, criatividade e personalidade visual.',
+    'Diorama':       '{{nome}} funciona muito bem como peça central de uma composição, podendo ser combinado com outros elementos para criar um pequeno cenário.'
+  };
+
+  var COMPLEMENTOS = [
+    'Uma peça que merece um espaço especial.',
+    'Perfeita para deixar sua coleção ainda mais completa.',
+    'Ideal para fãs, colecionadores e apaixonados por cultura geek.',
+    'Uma ótima opção para decorar seu setup.',
+    'Perfeita para presentear aquele fã de {{jogo}}.',
+    'Uma peça que chama atenção pelos detalhes.',
+    'Coloque na estante e deixe {{nome}} roubar a cena.',
+    'Uma escolha diferente para quem gosta de colecionar.',
+    'Ideal para montar uma coleção temática.',
+    'Uma peça para admirar de perto.',
+    'Perfeita para criar uma decoração com personalidade.',
+    'Um pequeno detalhe que pode transformar todo o ambiente.',
+    'Para colecionar, decorar ou simplesmente deixar à mostra.',
+    'Uma peça feita para quem gosta de sair do comum.',
+    'O tipo de item que todo fã gostaria de ter.',
+    'Combine com outras peças e monte seu próprio universo.',
+    'Uma ótima adição para qualquer coleção geek.',
+    'Deixe sua paixão por {{jogo}} também fazer parte da decoração.',
+    'Uma peça que fica ainda melhor quando acompanhada de outras do mesmo universo.',
+    'Ideal para quem valoriza detalhes e personalidade.',
+    'Uma maneira diferente de demonstrar sua paixão pelo personagem.',
+    'Perfeita para sua estante, mesa ou setup.',
+    'Uma peça pequena, mas com muita presença.',
+    'Aquele detalhe que faz toda a diferença na coleção.',
+    'Porque algumas paixões merecem sair da tela.'
+  ];
 
   var GANCHOS = {
     geral: ['{n} impresso em 3D, feito sob encomenda aqui no ateliê.',
@@ -2358,23 +2504,81 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     return lista(tams);
   }
 
+  var CORPO_CARACT = [
+    'Impresso em {{material}}, com {{caracteristicas}}.',
+    'Feito em {{material}} e finalizado com cuidado, com destaque para {{caracteristicas}}.',
+    'Produzido em {{material}}, trazendo {{caracteristicas}}.'
+  ];
+
+  function preenche(txt, v){
+    return txt.replace(/\{\{(\w+)\}\}/g, function(_, k){ return v[k] || ''; });
+  }
+  function faltaCampo(txt, v){
+    var achados = txt.match(/\{\{(\w+)\}\}/g) || [];
+    return achados.some(function(x){ return !v[x.slice(2, -2)]; });
+  }
+  // Anda pelo banco a partir da semente até achar uma frase que possa ser
+  // preenchida por inteiro — assim nunca sai texto com lacuna.
+  function escolhe(banco, semente, v){
+    for(var i = 0; i < banco.length; i++){
+      var f = banco[(semente + i) % banco.length];
+      if(!faltaCampo(f, v)) return preenche(f, v);
+    }
+    return '';
+  }
+
+  // Categorias que não falam de personagem usam o repertório temático antigo.
+  var SEM_PERSONAGEM = {decor:1, pets:1, esporte:1, carros:1};
+
   function geraDescricao(prod, cat, giro){
     var nome = (prod.nome||'').trim() || 'Esta peça';
+    var tema = temaCategoria(cat.nome);
     var s = embaralha(nome + '|' + (cat.nome||''), giro);
+
+    var tams = (prod.vars||[]).map(function(x){ return (x.t||'').trim(); })
+      .filter(function(t, i, a){ return t && a.indexOf(t) === i; });
+
+    var v = {
+      nome: nome,
+      jogo: (prod.universo||'').trim(),
+      universo: (prod.universo||'').trim(),
+      categoria: (cat.nome||'').trim(),
+      estilo: (prod.estilo||'').toLowerCase(),
+      caracteristicas: (prod.caract||'').trim(),
+      material: 'PLA',
+      altura: tams.length ? listaTamanhos(tams) : '',
+      tema: tema
+    };
+
     var partes = [];
 
-    partes.push(pega(GANCHOS[temaCategoria(cat.nome)] || GANCHOS.geral, s).replace('{n}', nome));
-    partes.push(pega(CORPO, s+1));
+    // 1 · Abertura
+    if(tema === 'adaptacao')          partes.push(escolhe(ABERTURA_ADAPTACAO, s, v));
+    else if(v.jogo)                   partes.push(escolhe(ABERTURA_JOGO, s, v));
+    else if(SEM_PERSONAGEM[tema])     partes.push(pega(GANCHOS[tema] || GANCHOS.geral, s).replace('{n}', nome));
+    else                              partes.push(escolhe(ABERTURA_PERSONAGEM, s, v));
 
-    var tams = (prod.vars||[]).map(function(v){ return (v.t||'').trim(); })
-      .filter(function(t, i, a){ return t && a.indexOf(t) === i; });
+    // 2 · Estilo, quando cadastrado
+    var temEstilo = !!(prod.estilo && ESTILOS[prod.estilo]);
+    if(temEstilo) partes.push(preenche(ESTILOS[prod.estilo], v));
+
+    // 3 · Material e características
+    partes.push(v.caracteristicas ? escolhe(CORPO_CARACT, s+1, v) : pega(CORPO, s+1));
+
+    // 4 · Tamanhos
     if(tams.length){
       partes.push(pega(tams.length > 1 ? TAMANHOS_VARIOS : TAMANHOS_UM, s+2)
         .replace('{t}', listaTamanhos(tams)));
     }
 
-    partes.push(pega(CONVITES, s+3));
-    return partes.join(' ');
+    // 5 · Complemento — só quando não houve frase de estilo, que cumpre o
+    // mesmo papel. Com as duas, o texto fica repetitivo e longo demais.
+    if(!temEstilo) partes.push(escolhe(COMPLEMENTOS, s+3, v));
+
+    // 6 · Convite ao orçamento
+    partes.push(pega(CONVITES, s+4));
+
+    return partes.filter(Boolean).join(' ');
   }
 
   /* ---------- editor de catálogo ---------- */
@@ -2452,10 +2656,18 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
               '<input type="text" data-c="'+ci+'" data-p="'+pi+'" data-f="nome" value="'+escapa(p.nome)+'" placeholder="Nome do produto" style="flex:1;min-width:140px">' +
               '<span class="preco-lab" id="pl-'+ci+'-'+pi+'">'+pr.txt+'</span>' +
             '</div>' +
+            '<div class="linha-topo">' +
+              '<input type="text" data-c="'+ci+'" data-p="'+pi+'" data-f="universo" value="'+escapa(p.universo||'')+'" placeholder="Universo / jogo / filme (ex.: God of War)" style="flex:2;min-width:150px">' +
+              '<select data-c="'+ci+'" data-p="'+pi+'" data-f="estilo" style="flex:1;min-width:130px">' +
+                '<option value="">Estilo (opcional)</option>' +
+                Object.keys(ESTILOS).map(function(e){ return '<option value="'+e+'"'+(p.estilo===e?' selected':'')+'>'+e+'</option>'; }).join('') +
+              '</select>' +
+            '</div>' +
+            '<input type="text" data-c="'+ci+'" data-p="'+pi+'" data-f="caract" value="'+escapa(p.caract||'')+'" placeholder="Características (ex.: base temática e capa esculpida)">' +
             '<textarea rows="3" data-c="'+ci+'" data-p="'+pi+'" data-f="desc" placeholder="Descrição: material, acabamento, base inclusa… ou gere uma abaixo.">'+escapa(p.desc||'')+'</textarea>' +
             '<div style="display:flex; gap:7px; align-items:center; flex-wrap:wrap">' +
               '<button class="btn tiny" data-gera='+alvo+' type="button">' + (p.desc ? 'Gerar outra descrição' : 'Gerar descrição') + '</button>' +
-              '<span class="sub">usa o nome, a categoria e os tamanhos cadastrados</span>' +
+              '<span class="sub">usa nome, universo, estilo, características, categoria e tamanhos</span>' +
             '</div>' +
             '<select data-c="'+ci+'" data-p="'+pi+'" data-f="modo">' +
               Object.keys(MODOS).map(function(k){ return '<option value="'+k+'"'+(p.modo===k?' selected':'')+'>'+MODOS[k]+'</option>'; }).join('') +
