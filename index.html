@@ -2190,65 +2190,146 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 
   function temaCategoria(nomeCat){
     var s = (nomeCat||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
-    if(/anime|manga|otaku|naruto|dragon|one ?piece|jujutsu|demon/.test(s)) return 'anime';
-    if(/game|jogo|gamer|minecraft|mario|zelda|souls|pokemon|sonic/.test(s)) return 'games';
-    if(/marvel|dc\b|heroi|heroe|vingador|batman|homem|liga da justica|quadrinho/.test(s)) return 'heroi';
-    if(/carro|auto|hot ?wheels|veiculo|moto|f1|formula/.test(s)) return 'carros';
-    if(/desenho|cartoon|disney|pixar|infantil|crianca/.test(s)) return 'desenho';
-    if(/terror|horror|halloween|assombr|monstro/.test(s)) return 'terror';
-    if(/vaso|planta|flor|decor|casa|utilit/.test(s)) return 'decor';
+    if(/anime|manga|otaku|naruto|dragon ?ball|one ?piece|jujutsu|demon ?slayer|titan|goku|saiy/.test(s)) return 'anime';
+    if(/game|jogo|gamer|minecraft|mario|zelda|souls|pokemon|sonic|among|fortnite|roblox/.test(s)) return 'games';
+    if(/marvel|dc\b|heroi|heroe|vingador|batman|superman|spider|aranha|liga da justica|quadrinho/.test(s)) return 'heroi';
+    if(/carro|auto|hot ?wheels|veiculo|moto|f1|formula|caminhao|jipe|drift/.test(s)) return 'carros';
+    if(/desenho|cartoon|disney|pixar|infantil|crianca|bob esponja|looney/.test(s)) return 'desenho';
+    if(/terror|horror|halloween|assombr|monstro|zumbi|caveira|skull/.test(s)) return 'terror';
+    // Termos curtos exigem palavra inteira: sem isso "colecionaveis" casava
+    // com "nave" e caía no tema errado.
+    if(/colecion|action ?figure|\bbustos?\b|estatu|\bfigures?\b/.test(s)) return 'colecionavel';
+    if(/star ?wars|sci-?fi|espacial|\bespaco\b|\brobos?\b|mecha|\baliens?\b|\bnaves?\b|futurist/.test(s)) return 'scifi';
+    if(/\brpg\b|\bdnd\b|d&d|tabletop|\bdados?\b|dragao|\belfos?\b|\borcs?\b|medieval|cavaleiro|fantasia/.test(s)) return 'rpg';
+    if(/\bpets?\b|cachorro|\bgatos?\b|animal|animais|\bbichos?\b|\bdino|passaro/.test(s)) return 'pets';
+    if(/futebol|\btimes?\b|esporte|escudo|trofeu|corinthians|flamengo|palmeiras|selecao/.test(s)) return 'esporte';
+    if(/presente|personaliz|namorad|casamento|aniversari|dia das|lembranc/.test(s)) return 'presente';
+    if(/vaso|planta|flor|decor|casa|utilit|organiz|suporte|luminaria/.test(s)) return 'decor';
     return 'geral';
   }
 
   var GANCHOS = {
     geral: ['{n} impresso em 3D, feito sob encomenda aqui no ateliê.',
             '{n} saindo da impressora camada por camada, do jeito que colecionador gosta.',
-            '{n} para quem prefere ter a peça na estante, e não só na tela.'],
+            '{n} para quem prefere ter a peça na estante, e não só na tela.',
+            '{n} feito por encomenda, uma peça de cada vez.',
+            '{n} para quem gosta de ter a coisa em mãos.',
+            '{n} sai da impressora direto para a sua prateleira.'],
     anime: ['{n} direto do anime para a sua estante.',
             '{n} em versão de coleção, para quem já assistiu a série inteira mais de uma vez.',
-            '{n} pausado no melhor frame e trazido para o mundo real.'],
+            '{n} pausado no melhor frame e trazido para o mundo real.',
+            '{n} para quem defende esse personagem em qualquer discussão.',
+            '{n} em versão física, sem precisar esperar a próxima temporada.',
+            '{n} para a estante de quem acompanha desde o primeiro episódio.'],
     games: ['{n} saiu do jogo e apareceu na sua mesa.',
             '{n} em versão física, dessa vez sem precisar de save.',
-            '{n} para quem zerou o jogo e queria levar alguma coisa junto.'],
+            '{n} para quem zerou o jogo e queria levar alguma coisa junto.',
+            '{n} pronto para montar guarda ao lado do monitor.',
+            '{n} em forma de troféu, para quem já platinou.',
+            '{n} para quem lembra da fase de cor até hoje.'],
     heroi: ['{n} pronto para o pouso heroico na sua estante.',
             '{n} em escala de coleção, pose e atitude inclusas.',
-            '{n} para quem escolheu um lado e não pretende mudar.'],
+            '{n} para quem escolheu um lado e não pretende mudar.',
+            '{n} de vigia na sua prateleira, em tempo integral.',
+            '{n} para quem leu antes de virar filme.',
+            '{n} em versão de coleção, para dividir espaço com os outros da equipe.'],
     carros:['{n} estacionado na sua mesa — sem seguro, sem IPVA e sem multa.',
             '{n} em miniatura, do tipo que nunca vai precisar de revisão.',
-            '{n} para quem ama o carro mas prefere a versão que cabe na estante.'],
+            '{n} para quem ama o carro mas prefere a versão que cabe na estante.',
+            '{n} na garagem que sempre coube no orçamento.',
+            '{n} para quem reconhece o modelo só pela lanterna.',
+            '{n} em escala, com o capricho que o original merece.'],
     desenho:['{n} do desenho para a prateleira, com a mesma cara de sempre.',
             '{n} em versão física, para quem cresceu vendo e nunca largou.',
-            '{n} pronto para dividir espaço com o resto da coleção.'],
+            '{n} pronto para dividir espaço com o resto da coleção.',
+            '{n} para quem lembra do horário em que passava.',
+            '{n} do jeito que você guardou na memória.',
+            '{n} em peça de verdade, para a estante ou para presentear.'],
     terror:['{n} para assombrar a estante em horário comercial.',
             '{n} em versão de coleção, com todo o desconforto no lugar certo.',
-            '{n} para quem gosta de sustos que não se mexem.'],
+            '{n} para quem gosta de sustos que não se mexem.',
+            '{n} pronto para encarar as visitas de cima da prateleira.',
+            '{n} para quem acha o Halloween curto demais.',
+            '{n} em peça física, para deixar o ambiente levemente perturbador.'],
+    scifi: ['{n} recém-chegado de uma galáxia distante.',
+            '{n} em escala, pousado na sua estante.',
+            '{n} para quem sabe a diferença entre as versões de cada filme.',
+            '{n} pronto para a próxima missão, ou para a prateleira mesmo.',
+            '{n} em peça física, sem precisar de hiperespaço.',
+            '{n} para quem gosta de tecnologia que ainda não existe.'],
+    rpg:   ['{n} pronto para entrar em campo na próxima sessão.',
+            '{n} para a mesa que leva o cenário a sério.',
+            '{n} em miniatura, do tamanho certo para o tabuleiro.',
+            '{n} para dar cara ao personagem que só existia na ficha.',
+            '{n} esperando a próxima rolagem de iniciativa.',
+            '{n} em peça física, para a campanha ou para a estante.'],
+    pets:  ['{n} em peça, do jeitinho que você conhece.',
+            '{n} para quem tem foto do bicho no papel de parede.',
+            '{n} pronto para ocupar um canto da estante sem fazer bagunça.',
+            '{n} em versão que não pede comida de madrugada.',
+            '{n} para presentear quem ama esse bicho.',
+            '{n} impresso com todo o cuidado nos detalhes.'],
+    esporte:['{n} para quem carrega o time para todo lado.',
+            '{n} em peça, para a estante ou para a mesa do escritório.',
+            '{n} pronto para provocar a visita de time contrário.',
+            '{n} para quem acompanha desde criança.',
+            '{n} em versão física, com o capricho que a paixão pede.',
+            '{n} para dar uma cara ao cantinho do torcedor.'],
+    presente:['{n} feito sob encomenda, do jeito que a pessoa gosta.',
+            '{n} para aquele presente que ninguém mais vai dar igual.',
+            '{n} em peça personalizada, impressa uma a uma.',
+            '{n} para transformar a lembrança em algo que fica.',
+            '{n} pensado para presentear com significado.',
+            '{n} feito por encomenda, com o detalhe que faz a diferença.'],
+    colecionavel:['{n} em escala de coleção, para a prateleira certa.',
+            '{n} com o acabamento que peça de vitrine pede.',
+            '{n} para quem organiza a estante por ordem de preferência.',
+            '{n} em peça de exposição, feita uma por vez.',
+            '{n} para quem já sabe exatamente onde vai colocar.',
+            '{n} pronto para entrar na coleção sem desafinar do conjunto.'],
     decor: ['{n} impresso em 3D para dar personalidade ao ambiente.',
             '{n} feito sob medida, do tipo que ninguém mais tem igual.',
-            '{n} para resolver aquele canto que estava pedindo alguma coisa.']
+            '{n} para resolver aquele canto que estava pedindo alguma coisa.',
+            '{n} em peça única, do tamanho que você precisa.',
+            '{n} para quem gosta de ambiente com cara própria.',
+            '{n} feito por encomenda, combinando com o resto da casa.']
   };
   var CORPO = [
     'Impresso em PLA com acabamento fosco e detalhes bem definidos, feito sob encomenda aqui no ateliê.',
     'Feito em PLA de alta qualidade, com acabamento fino e base inclusa.',
     'Produzido uma peça por vez, com atenção a cada detalhe do acabamento.',
     'Impressão em PLA com acabamento fosco uniforme e base inclusa.',
-    'Feito sob encomenda em PLA, pronto para ir direto da caixa para a estante.'
+    'Feito sob encomenda em PLA, pronto para ir direto da caixa para a estante.',
+    'Impresso em PLA, com acabamento cuidado e detalhes bem marcados.',
+    'Peça em PLA, produzida sob encomenda e conferida uma a uma antes de sair.',
+    'Feito em PLA resistente, com acabamento fosco e boa firmeza na base.',
+    'Impressão sob encomenda em PLA, com acabamento pronto para exibir.',
+    'Produzido em PLA com atenção ao encaixe e ao acabamento de cada parte.'
   ];
   var TAMANHOS_UM = [
     'Disponível em {t}.',
     'Sai em {t}.',
-    'Feito em {t}.'
+    'Feito em {t}.',
+    'Tamanho: {t}.',
+    'Produzido em {t}.'
   ];
   var TAMANHOS_VARIOS = [
     'Disponível nas variações de {t}.',
     'Sai nas variações de {t} — o tamanho muda o preço, o capricho não.',
     'Escolha entre {t}.',
-    'Disponível em {t}.'
+    'Disponível em {t}.',
+    'Você escolhe o tamanho: {t}.',
+    'Feito em {t}, conforme a sua preferência.',
+    'Tamanhos disponíveis: {t}.'
   ];
   var CONVITES = [
     'Caso deseje outro tamanho, entre em contato e faça seu orçamento.',
     'Precisa de outra medida? Fale com a gente e monte seu orçamento.',
     'Quer em um tamanho diferente dos que estão aqui? É só chamar que fazemos um orçamento sob medida.',
-    'Se quiser outro tamanho, entre em contato — a gente faz o orçamento sem compromisso.'
+    'Se quiser outro tamanho, entre em contato — a gente faz o orçamento sem compromisso.',
+    'Trabalhamos com outras medidas sob encomenda: chame e peça seu orçamento.',
+    'Precisa maior ou menor? Fale com a gente que ajustamos e orçamos para você.',
+    'Outros tamanhos saem sob encomenda — entre em contato para orçar.'
   ];
 
   function embaralha(txt, giro){
