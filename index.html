@@ -552,6 +552,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       <button class="btn" id="btnExport" type="button">Exportar</button>
       <button class="btn" id="btnImport" type="button">Importar</button>
       <button class="btn primary" id="btnSave" type="button">Salvar peça</button>
+      <button class="btn primary" id="btnPublicar" type="button">Publicar na loja</button>
       <button class="btn primary" id="btnInstalar" type="button" hidden>Instalar app</button>
       <input type="file" id="fileIn" accept="application/json" hidden>
     </div>
@@ -956,7 +957,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
         <div class="price" id="precoSugerido"><small>R$</small>0,00</div>
         <div class="price-sub" id="precoSub">por unidade</div>
         <div class="roundbox">
-          <span class="chip">Redondo <b id="precoRedondo">—</b></span>
+          <span class="chip">Exato <b id="precoExato">—</b></span>
           <span class="chip">Mínimo <b id="precoMinimo">—</b></span>
           <span class="chip" id="chipFrete" hidden>Frete <b id="freteInfo">—</b></span>
         </div>
@@ -1178,6 +1179,58 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 
 </div>
 
+<dialog id="dlgPublicar">
+  <form method="dialog" class="dlg-x"><button class="btn tiny ghost" type="submit">Fechar</button></form>
+  <h2 class="dlg-t">Publicar na loja</h2>
+  <p class="dlg-s">A peça que você acabou de calcular vai para o catálogo já marcada como publicada. Se já existir uma com o mesmo nome na categoria escolhida, o preço dela é atualizado em vez de criar repetida.</p>
+
+  <div class="dlg-passo">
+    <div class="row">
+      <div class="f">
+        <label for="pubNome">Nome do produto</label>
+        <div class="inp"><input class="txt" type="text" id="pubNome" placeholder="Dragão Articulado"></div>
+      </div>
+      <div class="f">
+        <label for="pubCat">Categoria</label>
+        <div class="inp"><select class="txt" id="pubCat"></select></div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="f" id="pubCatNovaBox" hidden>
+        <label for="pubCatNova">Nome da nova categoria</label>
+        <div class="inp"><input class="txt" type="text" id="pubCatNova" placeholder="Colecionáveis"></div>
+      </div>
+      <div class="f">
+        <label for="pubTam">Tamanho desta versão</label>
+        <div class="inp"><input class="txt" type="text" id="pubTam" placeholder="15 cm"></div>
+        <span class="sub">Deixe em branco se a peça tem um tamanho só.</span>
+      </div>
+      <div class="f">
+        <label for="pubPreco">Preço de etiqueta</label>
+        <div class="inp"><input class="txt" type="text" id="pubPreco" inputmode="decimal"></div>
+        <span class="sub" id="pubPrecoNota"></span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="f">
+        <label for="pubPrazo">Pronta em (dias úteis)</label>
+        <div class="inp"><input class="txt" type="number" min="1" max="90" id="pubPrazo" value="5"></div>
+      </div>
+      <div class="f">
+        <label for="pubEstoque">Estoque</label>
+        <div class="inp"><input class="txt" type="number" min="0" id="pubEstoque" value="999"></div>
+        <span class="sub">999 = produzido sob demanda.</span>
+      </div>
+    </div>
+    <p class="note" id="pubEscada"></p>
+  </div>
+
+  <div class="dlg-acts" style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap">
+    <button class="btn primary" id="btnPublicarOk" type="button">Publicar</button>
+  </div>
+  <p class="note" id="pubAviso" style="margin-top:8px"></p>
+</dialog>
+
 <dialog id="dlgNuvem">
   <form method="dialog" class="dlg-x"><button class="btn tiny ghost" type="submit">Fechar</button></form>
   <h2 class="dlg-t">Sincronizar na nuvem</h2>
@@ -1338,6 +1391,35 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     return f ? Math.min(90, f[1])/100 : 0;
   }
 
+  /* ---------- arredondamento comercial ----------
+     O cálculo devolve números como 127,43, que ninguém põe numa etiqueta.
+     Aqui o preço cai no final ",90" mais próximo — 125 vira 124,90 e 128 vira
+     129,90 — indo para o mais perto, para cima ou para baixo.
+
+     A grade muda conforme o tamanho do preço porque uma só não serve para
+     tudo: numa peça de R$ 12, saltar de 5 em 5 comeria quase metade da
+     margem.
+
+     `piso` é a trava de segurança. Se arredondar para baixo derrubar o preço
+     abaixo do mínimo que cobre custo e taxas, sobe para o degrau seguinte.
+     Preço bonito nunca pode custar dinheiro. */
+  function gradeDe(v){
+    if(v < 20) return 1;
+    if(v < 300) return 5;
+    return 10;
+  }
+  function arredondaComercial(v, piso){
+    if(!(v > 0)) return 0;
+    var g = gradeDe(v);
+    // Os degraus terminam dez centavos antes de fechar a grade: com grade 5
+    // são 114,90 · 119,90 · 124,90 · 129,90; com grade 10, 299,90 · 309,90.
+    var resto = g - 0.1;
+    var alvo = Math.round((v - resto) / g) * g + resto;
+    if(alvo <= 0) alvo = resto;
+    while(piso > 0 && alvo < piso) alvo += gradeDe(alvo);
+    return +alvo.toFixed(2);
+  }
+
   // Custo por unidade num pedido de `qtd` unidades. Só o frete embutido varia com a quantidade.
   function custoDe(qtd){
     var tempoH = val('horas') + val('minutos')/60;
@@ -1378,13 +1460,14 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 
     // Preço de tabela: venda avulsa de 1 unidade, com o frete inteiro se ele for embutido.
     var base = custoDe(1);
-    var precoTabela = taxasOK ? base.total * (1 + margem) / restante : 0;
     var precoMin    = taxasOK ? base.total / restante : 0;
+    var precoExato  = taxasOK ? base.total * (1 + margem) / restante : 0;
+    var precoTabela = arredondaComercial(precoExato, precoMin);
 
     // Este pedido: custo por peça na quantidade pedida, com a faixa de desconto aplicada.
     var d = custoDe(qtd);
     var desconto = descontoPara(qtd);
-    var precoUn = precoTabela * (1 - desconto);
+    var precoUn = arredondaComercial(precoTabela * (1 - desconto), precoMin);
     var lucro = precoUn * restante - d.total;
     var margemLiq = precoUn > 0 ? lucro/precoUn : 0;
     var lucroHora = d.tempoUn > 0 ? lucro/d.tempoUn : 0;
@@ -1394,6 +1477,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 
     var r = {
       c:d.c, custoTotal:d.total, precoTabela:precoTabela, precoSug:precoTabela, precoUn:precoUn,
+      precoExato:precoExato,
       precoMin:precoMin, desconto:desconto, lucro:lucro, margemLiq:margemLiq, lucroHora:lucroHora,
       taxas:taxas, taxasOK:taxasOK, qtd:qtd, modo:modo, freteEmb:d.freteEmb, freteCliente:freteCliente,
       totalPedido: precoUn*qtd + freteCliente, lucroPedido: lucro*qtd,
@@ -1408,7 +1492,9 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     });
     r.escada = pontos.map(function(p){
       var cd = custoDe(p.q);
-      var pu = precoTabela * (1 - p.d);
+      // Cada degrau também cai no ",90": a tabela que o cliente vê fica
+      // inteira em preço de etiqueta, e não só a primeira linha.
+      var pu = arredondaComercial(precoTabela * (1 - p.d), precoMin);
       var lu = pu * restante - cd.total;
       return { qtd:p.q, desc:p.d, preco:pu, custo:cd.total, lucro:lu,
                margem: pu > 0 ? lu/pu : 0, lucroLote: lu*p.q,
@@ -1471,13 +1557,6 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       '<tfoot><tr><td>'+rotuloTotal+'</td><td class="n">'+money(total)+'</td><td class="n">100%</td></tr></tfoot>';
   }
 
-  function arredonda(v){
-    if(v <= 0) return 0;
-    if(v < 20) return Math.ceil(v);                        // até R$20: real cheio
-    if(v < 100) return Math.ceil(v/5)*5 - 0.10;            // R$24,90 / R$29,90
-    return Math.ceil(v/10)*10 - 0.10;                      // R$119,90
-  }
-
   var r = null;
 
   function render(){
@@ -1485,7 +1564,9 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 
     $('precoSugerido').innerHTML = '<small>R$</small>' + num(r.precoTabela,2);
     $('precoSub').textContent = 'preço de tabela, 1 un · ' + num(r.tempoUn,2).replace(',00','') + ' h de máquina · ' + num(r.gramasTotal,0) + ' g de filamento';
-    $('precoRedondo').textContent = money(arredonda(r.precoTabela));
+    // O preço em destaque já sai arredondado para etiqueta; aqui fica o valor
+    // exato que o cálculo devolveu, para você ver o quanto foi cedido ou ganho.
+    $('precoExato').textContent = money(r.precoExato);
     $('precoMinimo').textContent = money(r.precoMin);
 
     var chipF = $('chipFrete');
@@ -1648,6 +1729,106 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     var idx = a.findIndex(function(p){ return p.nome.toLowerCase() === nome.toLowerCase(); });
     if(idx > -1) a[idx] = reg; else a.push(reg);
     setLib(a);
+  });
+
+  /* ---------- publicar direto da calculadora ----------
+     Evita o retrabalho de calcular aqui e cadastrar de novo no catálogo: a
+     peça recém-calculada vira produto publicado num passo só. Se já houver
+     uma com o mesmo nome na categoria, o preço dela é atualizado. */
+
+  function opcoesDeCategoria(){
+    var cats = catalogo();
+    return cats.map(function(c, i){
+      return '<option value="'+i+'">'+escapa(c.nome || 'Categoria '+(i+1))+'</option>';
+    }).join('') + '<option value="nova">+ Nova categoria…</option>';
+  }
+
+  function textoDaEscada(base){
+    var f = faixas();
+    if(!f.length) return 'Sem faixas de desconto configuradas — o preço vale para qualquer quantidade. ' +
+      'Para dar desconto por volume, preencha as faixas nas configurações da calculadora.';
+    var linhas = escadaDeQuantidade(base).map(function(x){
+      return (x.qtd === 1 ? '1 un' : x.qtd + '+ un') + ': ' + money(x.preco) + ' cada';
+    });
+    return 'Desconto por quantidade que vai junto: ' + linhas.join(' · ');
+  }
+
+  function abrePublicar(){
+    var d = $('dlgPublicar');
+    $('pubNome').value = $('nomePeca').value.trim();
+    $('pubCat').innerHTML = opcoesDeCategoria();
+    $('pubCatNovaBox').hidden = $('pubCat').value !== 'nova';
+    $('pubTam').value = '';
+    $('pubPreco').value = num(r.precoTabela, 2);
+    $('pubPrecoNota').textContent = r.precoExato && Math.abs(r.precoExato - r.precoTabela) > 0.005
+      ? 'Cálculo exato: ' + money(r.precoExato) + ' — arredondado para etiqueta.'
+      : '';
+    $('pubEscada').textContent = textoDaEscada(r.precoTabela);
+    $('pubAviso').textContent = '';
+    if(!$('pubNome').value){
+      $('pubAviso').textContent = 'Dê um nome à peça na calculadora antes de publicar.';
+    }
+    d.showModal();
+  }
+
+  $('btnPublicar').addEventListener('click', abrePublicar);
+  $('pubCat').addEventListener('change', function(){
+    $('pubCatNovaBox').hidden = this.value !== 'nova';
+  });
+  $('pubPreco').addEventListener('input', function(){
+    $('pubEscada').textContent = textoDaEscada(parseNum(this.value));
+  });
+
+  $('btnPublicarOk').addEventListener('click', function(){
+    var nome = $('pubNome').value.trim();
+    if(!nome){ $('pubAviso').textContent = 'O produto precisa de um nome.'; $('pubNome').focus(); return; }
+
+    var preco = parseNum($('pubPreco').value);
+    if(!(preco > 0)){ $('pubAviso').textContent = 'Informe um preço maior que zero.'; $('pubPreco').focus(); return; }
+
+    var cats = catalogo();
+    var escolha = $('pubCat').value;
+    var cat;
+
+    if(escolha === 'nova'){
+      var nomeCat = $('pubCatNova').value.trim();
+      if(!nomeCat){ $('pubAviso').textContent = 'Dê um nome à nova categoria.'; $('pubCatNova').focus(); return; }
+      cat = {id:novoId('c'), nome:nomeCat, orient:'h', produtos:[]};
+      cats.push(cat);
+    } else {
+      cat = cats[+escolha];
+      if(!cat){ $('pubAviso').textContent = 'Escolha uma categoria.'; return; }
+    }
+    cat.produtos = cat.produtos || [];
+
+    var tamanho = $('pubTam').value.trim() || 'Único';
+    var prod = cat.produtos.filter(function(p){ return !p.link; }).find(function(p){
+      return (p.nome||'').trim().toLowerCase() === nome.toLowerCase();
+    });
+
+    if(!prod){
+      prod = {id:novoId('p'), nome:nome, desc:'', modo:'unico', vars:[]};
+      cat.produtos.push(prod);
+    }
+
+    // Mesmo tamanho já cadastrado: atualiza o preço em vez de duplicar a linha.
+    prod.vars = prod.vars || [];
+    var v = prod.vars.find(function(x){ return (x.t||'').trim().toLowerCase() === tamanho.toLowerCase(); });
+    if(v) v.p = num(preco, 2);
+    else prod.vars.push({t:tamanho, p:num(preco, 2)});
+
+    prod.modo = prod.vars.length > 1 ? 'apartir' : 'unico';
+    prod.pub = true;
+    prod.prazo = Math.max(1, parseInt($('pubPrazo').value, 10) || 5);
+    prod.estoque = Math.max(0, parseInt($('pubEstoque').value, 10) || 0);
+    if(!prod.slug) defineEndereco(cats, prod);
+
+    setCatalogo(cats);
+    $('dlgPublicar').close();
+
+    // Leva para o catálogo já com a peça no lugar, para conferir foto e texto.
+    $('tabCatalogo').click();
+    window.scrollTo({top:0, behavior:'smooth'});
   });
 
   /* ---------- cor: OKLab ----------
@@ -1825,6 +2006,25 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     return Math.abs(h).toString(36);
   }
 
+  /* Desconto por quantidade que acompanha o produto até a loja.
+     Vem das faixas globais da calculadora — as mesmas que você já configura
+     ali. Assim a regra é definida num lugar só e vale para tudo que for
+     publicado; para deixar o desconto mais suave ou mais agressivo, basta
+     mexer nas faixas, sem produto a produto. */
+  function escadaDeQuantidade(base){
+    if(!(base > 0)) return [];
+    var pontos = [{qtd:1, preco:arredondaComercial(base, 0)}];
+    faixas().slice().reverse().forEach(function(f){
+      var q = Math.round(f[0]);
+      if(q > 1){
+        var p = arredondaComercial(base * (1 - Math.min(90, f[1])/100), 0);
+        // Faixa que não baixa o preço não vira linha: só confundiria.
+        if(p < pontos[pontos.length-1].preco) pontos.push({qtd:q, preco:p});
+      }
+    });
+    return pontos;
+  }
+
   function montaVitrine(){
     var cats = catalogo(), fotos = fotosLoja(), usados = {}, saida = [];
 
@@ -1858,6 +2058,8 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
           tamanhos: consulta ? [] : tamanhos.map(function(v){
             return {nome:v.nome, preco:v.preco, adicional: +(v.preco - base).toFixed(2)};
           }),
+          // Leve mais, pague menos por unidade — as faixas da calculadora.
+          faixas: consulta ? [] : escadaDeQuantidade(base),
           foto: fotos['p:' + prod.id] ? fotos['p:' + prod.id].url : '',
           capaCategoria: fotos['c:' + cat.id] ? fotos['c:' + cat.id].url : '',
           universo: (prod.universo||'').trim(),
@@ -2097,10 +2299,11 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   /* ---------- orçamento em PDF ---------- */
   function texto(id){ return $(id).value.trim(); }
 
-  // Números que o cliente vê. Arredonda só o preço de tabela e deriva o resto dele,
-  // senão o desconto exibido não bate com o percentual anunciado.
+  // Números que o cliente vê. Parte do preço de tabela — que já sai arredondado
+  // para etiqueta — e deriva o resto dele, senão o desconto exibido não bate
+  // com o percentual anunciado.
   function totaisComerciais(){
-    var linha = arredonda(r.precoTabela);
+    var linha = r.precoTabela;
     var subtotal = linha * r.qtd;
     var abatimento = subtotal * r.desconto;
     var frete = r.freteCliente;
