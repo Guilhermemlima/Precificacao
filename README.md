@@ -150,6 +150,24 @@ Quando o automático erra, dá para corrigir: **clicar na foto** fixa aquela cor
 
 Um botão desconta do estoque as gramas estimadas de cada cor.
 
+## Publicar na loja
+
+Cada produto do catálogo tem uma caixa **Publicar na loja**. Marcada, a peça passa a aparecer no site da Moldarte 3D — com nome, descrição, categoria, foto, tamanhos e preços. Ao marcar, aparecem dois campos ao lado: **prazo de produção**, em dias úteis, e **estoque**.
+
+O endereço da peça no site (`/produto/dragao-articulado`) é gerado do nome na primeira publicação e **não muda mais**: renomear a peça depois não quebra um link que já foi divulgado.
+
+Peça no modo **sob consulta** entra na loja sem botão de compra — no lugar dele vai um "Pedir orçamento". Cópias vinculadas não são publicadas: virariam o mesmo produto duas vezes, com endereços diferentes.
+
+Desmarcar tira a peça do ar na sincronização seguinte.
+
+### Como funciona por baixo
+
+O catálogo inteiro sobe como um documento só, então liberar a leitura dele exporia junto o que não foi publicado: rascunho, preço em estudo, produto fora do ar. Por isso publicar grava **uma linha por produto** numa coleção separada (`loja`), contendo apenas o que a vitrine mostra. A regra de segurança abre exatamente essa coleção para quem não tem login — pedidos, rolos de filamento, configurações e clientes continuam trancados.
+
+As fotos dos produtos publicados sobem para o **Storage**, e não como base64 dentro do banco: numa vitrine elas precisam de cache de CDN. Cada uma só é reenviada quando muda de verdade.
+
+> **Antes da primeira publicação**, rode o arquivo `supabase-loja.sql` no SQL Editor do projeto. Ele cria a regra de leitura pública e o espaço das fotos. Sem ele o resto continua sincronizando normalmente — só as fotos da loja não sobem, e o aviso aparece no console do navegador.
+
 ## Catálogo
 
 Terceira aba. Categorias livres (Anime, Games, Marvel, DC, Carros…), cada uma com capa horizontal ou vertical e quantos produtos você quiser. Cada produto tem foto, descrição e uma lista de tamanhos com preço próprio — 15 cm, 20 cm, 25 cm, 30 cm — e três modos de exibição: **a partir de** (mostra o menor preço), **preço único** ou **sob consulta**.
