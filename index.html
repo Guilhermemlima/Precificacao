@@ -4074,16 +4074,31 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     var ant = {};
     (antigos||[]).forEach(function(x){ if(x && x.id) ant[x.id] = JSON.stringify(x); });
     var c = carimbos(), t = tumulos(), agora = new Date().toISOString(), mudou = false;
+
+    function temTumulo(id){
+      return t.some(function(y){ return y.colecao === colecao && y.id === id; });
+    }
+
     (novos||[]).forEach(function(x){
       if(!x || !x.id) return;
       if(ant[x.id] !== JSON.stringify(x)){ c[colecao + ':' + x.id] = agora; mudou = true; }
+      // O registro voltou a existir: um túmulo dele que ainda não subiu perde
+      // o sentido. Deixá-lo na fila faria o mesmo registro viajar duas vezes
+      // no lote — uma para gravar, outra para apagar — e o banco recusa.
+      if(temTumulo(x.id)){
+        t = t.filter(function(y){ return !(y.colecao === colecao && y.id === x.id); });
+        mudou = true;
+      }
       delete ant[x.id];
     });
+
     Object.keys(ant).forEach(function(id){
-      t.push({colecao:colecao, id:id, at:agora});
+      // Nunca empilha um segundo túmulo do mesmo registro.
+      if(!temTumulo(id)) t.push({colecao:colecao, id:id, at:agora});
       delete c[colecao + ':' + id];
       mudou = true;
     });
+
     if(mudou){ setCarimbos(c); setTumulos(t); agendaSync(); }
   }
 
@@ -4093,6 +4108,10 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     var cod = (corpo && (corpo.error_code || corpo.code)) || '';
     if(m.indexOf('email logins are disabled') > -1 || m.indexOf('email signups are disabled') > -1 || cod === 'email_provider_disabled')
       return 'O login por e-mail está desligado no projeto. Em Authentication → Sign In / Providers → Email, ligue a chave do provedor Email (a de cima) e deixe desmarcada só a opção Confirm email.';
+    if(m.indexOf('cannot affect row a second time') > -1)
+      return 'Duas alterações do mesmo item foram juntas no mesmo envio e o banco recusou o lote. ' +
+             'Isso acontecia ao publicar, despublicar e publicar de novo antes de sincronizar. ' +
+             'Já está corrigido: clique em “Sincronizar agora” outra vez.';
     if(m.indexOf('signups not allowed') > -1 || cod === 'signup_disabled')
       return 'Criação de contas desativada no projeto. Ligue em Authentication → Sign In / Providers → Email → Allow new users to sign up.';
     if(m.indexOf('email not confirmed') > -1 || cod === 'email_not_confirmed')
@@ -4207,7 +4226,18 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     tumulos().forEach(function(t){
       saida.push({colecao:t.colecao, id:t.id, conteudo:{}, apagado:true, _at:t.at, _tumulo:true});
     });
-    return saida;
+
+    // Rede de segurança: o mesmo registro não pode aparecer duas vezes no
+    // lote. O Postgres recusa o lote inteiro quando duas linhas do mesmo
+    // comando disputam o mesmo registro ("ON CONFLICT DO UPDATE command
+    // cannot affect row a second time"), e uma fila montada antes desta
+    // correção pode já estar assim. Vence a alteração mais recente.
+    var unico = {};
+    saida.forEach(function(e){
+      var chave = e.colecao + ':' + e.id;
+      if(!unico[chave] || e._at > unico[chave]._at) unico[chave] = e;
+    });
+    return Object.keys(unico).map(function(k){ return unico[k]; });
   }
 
   function aplicaRemoto(linhas){
