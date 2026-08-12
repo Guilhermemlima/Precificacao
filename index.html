@@ -1285,6 +1285,21 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   </div>
 
   <div class="dlg-passo">
+    <div class="mini-label">1b · Avisar a loja na hora <span class="sub">(opcional)</span></div>
+    <div class="row">
+      <div class="f">
+        <label for="nvLoja">Endereço da loja</label>
+        <div class="inp"><input class="txt" type="text" id="nvLoja" placeholder="https://mold-arte.vercel.app" autocomplete="off"></div>
+      </div>
+      <div class="f">
+        <label for="nvLojaChave">Chave de atualização</label>
+        <div class="inp"><input class="txt" type="password" id="nvLojaChave" placeholder="a mesma do REVALIDATE_SECRET" autocomplete="off"></div>
+      </div>
+    </div>
+    <p class="note">Sem isto a loja continua se atualizando sozinha, só que leva até meio minuto. Preenchendo, ela é avisada assim que você sincroniza e a mudança aparece quase na hora. A chave é qualquer texto que você invente — precisa ser o mesmo aqui e na variável <b>REVALIDATE_SECRET</b> da Vercel.</p>
+  </div>
+
+  <div class="dlg-passo">
     <div class="mini-label">2 · Sua conta</div>
     <div class="row">
       <div class="f">
@@ -4465,6 +4480,30 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
                pedido:'pedidos', rolo:'rolos de filamento', imagem:'imagens',
                loja:'produtos publicados'};
 
+  /* Avisa a loja que o catálogo mudou.
+     Sem este aviso, o site só descobre a mudança quando o prazo dele vence —
+     e você fica olhando para o preço antigo depois de já ter publicado o novo.
+     É opcional: sem o endereço e a chave configurados, nada acontece e o site
+     se atualiza sozinho pelo prazo. */
+  function avisaLoja(){
+    var c = cfgNuvem();
+    if(!c.loja || !c.lojaChave) return Promise.resolve(false);
+    return fetch(c.loja + '/api/revalidar', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({chave: c.lojaChave})
+    }).then(function(r){
+      if(!r.ok && window.console){
+        console.warn('A loja recusou o aviso de atualização (' + r.status +
+          '). Confira o endereço e se a chave é a mesma do REVALIDATE_SECRET.');
+      }
+      return r.ok;
+    }).catch(function(){
+      // Loja fora do ar ou endereço errado: o prazo automático cobre.
+      return false;
+    });
+  }
+
   function agendaSync(){
     if(!prontoParaSync()) return;
     clearTimeout(agendado);
@@ -4770,6 +4809,12 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       store('p3d.marcaAgua', maior);
       store('p3d.syncEm', new Date().toISOString());
       sincronizando = false; luzNuvem(); statusNuvem();
+
+      // Só avisa quando algo da vitrine subiu de verdade. Mudar um pedido ou
+      // um rolo de filamento não muda nada no site.
+      if(r && r.gravadas && r.gravadas.some(function(l){ return l.colecao === 'loja'; })){
+        avisaLoja();
+      }
     }).catch(function(e){
       sincronizando = false;
       ultimoErro = e.message || String(e);
@@ -4837,7 +4882,12 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   }
 
   function salvaCfgDaTela(){
-    setCfgNuvem({url: $('nvUrl').value.trim(), key: $('nvKey').value.trim()});
+    setCfgNuvem({
+      url: $('nvUrl').value.trim(),
+      key: $('nvKey').value.trim(),
+      loja: $('nvLoja').value.trim().replace(/\/+$/, ''),
+      lojaChave: $('nvLojaChave').value.trim()
+    });
   }
   function comBotao(btn, rotulo, promessa){
     var antes = btn.textContent;
@@ -4857,6 +4907,8 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     var c = cfgNuvem(), s = sessao();
     $('nvUrl').value = c.url || '';
     $('nvKey').value = c.key || '';
+    $('nvLoja').value = c.loja || '';
+    $('nvLojaChave').value = c.lojaChave || '';
     if(s && s.email) $('nvEmail').value = s.email;
     statusNuvem();
     $('dlgNuvem').showModal();
