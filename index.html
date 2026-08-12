@@ -3055,7 +3055,12 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
                     '<input type="number" min="1" max="90" style="width:58px" data-c="'+ci+'" data-p="'+pi+'" data-f="prazo" value="'+escapa(String(p.prazo||PRAZO_PADRAO))+'">dias</label>' +
                   '<label class="sub" style="display:flex; gap:5px; align-items:center">Estoque' +
                     '<input type="number" min="0" style="width:64px" data-c="'+ci+'" data-p="'+pi+'" data-f="estoque" value="'+escapa(String(p.estoque === undefined ? 999 : p.estoque))+'"></label>' +
-                  '<span class="sub" style="opacity:.75">/produto/'+escapa(p.slug||'')+'</span>'
+                  '<span class="sub" style="opacity:.75">/produto/'+escapa(p.slug||'')+'</span>' +
+                  '<span class="sub" style="flex-basis:100%; opacity:.8">' +
+                    (parseInt(p.estoque, 10) === 0
+                      ? '⚠ Estoque zero: a peça continua no site marcada como <b>Esgotado</b>, sem botão de compra. Para sumir de vez, desmarque acima.'
+                      : 'Estoque <b>0</b> deixa a peça no site como “Esgotado”. <b>Desmarcar</b> tira ela do site na próxima sincronização.') +
+                  '</span>'
                 : '<span class="sub">marque para esta peça aparecer no site</span>') +
             '</div>' +
             '<div class="vars">' + vars + '</div>' +
