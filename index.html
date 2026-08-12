@@ -2160,6 +2160,124 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     });
   }
 
+  /* ---------- pedidos vindos da loja ----------
+     O site grava em `pedidos_loja`, uma tabela separada. Aqui eles viram
+     pedidos normais desta aba, para você acompanhar prazo e faturamento num
+     lugar só. A marca `importado` no banco garante que cada um entre uma vez.
+
+     O que o site NÃO sabe é quanto a peça custou para produzir. Por isso o
+     pedido entra com custo zero e marcado como pendente: melhor aparecer um
+     aviso do que o painel mostrar lucro cheio e você decidir em cima disso. */
+
+  function prazoDoSlug(slug){
+    var achou = 0;
+    catalogo().forEach(function(c){
+      (c.produtos||[]).forEach(function(p){
+        if(p.slug === slug) achou = Math.max(1, parseInt(p.prazo, 10) || PRAZO_PADRAO);
+      });
+    });
+    return achou || PRAZO_PADRAO;
+  }
+
+  function statusLocalDe(s){
+    if(s === 'pago') return 'pago';
+    if(s === 'cancelado' || s === 'expirado') return 'cancelado';
+    return 'aguardando';
+  }
+
+  function pedidoDaLoja(pl){
+    var itens = Array.isArray(pl.itens) ? pl.itens : [];
+    var qtd = itens.reduce(function(n, i){ return n + (parseInt(i.quantidade, 10) || 0); }, 0);
+    var prazo = itens.reduce(function(m, i){ return Math.max(m, prazoDoSlug(i.slug)); }, 0) || PRAZO_PADRAO;
+    var data = (pl.criado_em || '').slice(0, 10) || hojeISO();
+    var nomes = itens.map(function(i){
+      return (i.quantidade > 1 ? i.quantidade + '× ' : '') + (i.nome || i.slug) +
+             (i.tamanho && i.tamanho !== 'Único' ? ' (' + i.tamanho + ')' : '');
+    });
+
+    return {
+      // Id derivado do pedido do site: reimportar nunca duplica.
+      id: 'loja-' + pl.id,
+      pedidoLoja: pl.id,
+      data: data,
+      entrega: addDias(data, prazo),
+      gramas: 0,
+      cliente: (pl.cliente && pl.cliente.nome) || 'Cliente do site',
+      peca: nomes.join(' + ') || 'Pedido do site',
+      qtd: qtd || 1,
+      status: statusLocalDe(pl.status),
+      receita: parseNum(pl.total),
+      taxas: 0,
+      custoProducao: 0,
+      custoTrabalho: 0,
+      custoEstrutura: 0,
+      horas: 0,
+      deprec: 0,
+      custoPendente: true
+    };
+  }
+
+  function importaPedidosDaLoja(){
+    var s = sessao();
+    if(!s || !s.user_id) return Promise.resolve(false);
+
+    return api('/rest/v1/pedidos_loja?select=*&importado=is.false&order=criado_em.asc',
+               {method:'GET'}, true)
+      .then(function(linhas){
+        linhas = linhas || [];
+        if(!linhas.length) return false;
+
+        var a = pedidos(), mudou = false;
+        linhas.forEach(function(pl){
+          var novo = pedidoDaLoja(pl);
+          // Só entra se ainda não existir aqui. Depois de importado, quem manda
+          // é esta aba: se a marcação lá no banco falhar e o pedido voltar na
+          // próxima sincronização, ele não pode desfazer o status que você já
+          // mudou nem a data de entrega que você ajustou.
+          if(a.some(function(x){ return x.id === novo.id; })) return;
+          a.push(novo);
+          marca('pedido', novo.id);
+          mudou = true;
+        });
+        if(mudou) setPedidos(a);
+
+        // Marca como importados só depois de gravar aqui: se a rede cair no
+        // meio, eles voltam na próxima sincronização em vez de sumirem.
+        var ids = linhas.map(function(l){ return '"' + l.id + '"'; }).join(',');
+        return api('/rest/v1/pedidos_loja?id=in.(' + encodeURIComponent(ids) + ')',
+                   {method:'PATCH', headers:{'Prefer':'return=minimal'},
+                    body: JSON.stringify({importado:true})}, true)
+          .then(function(){ return true; });
+      })
+      .catch(function(e){
+        // Sem a tabela ainda (supabase-estoque.sql não rodado), segue a vida.
+        if(window.console) console.warn('Pedidos da loja não vieram: ' + (e && e.message));
+        return false;
+      });
+  }
+
+  // Mudou o status de um pedido que veio da loja: o site precisa saber.
+  // Cancelar devolve as peças ao estoque; o resto só acompanha o status.
+  function avisaLojaDoStatus(p){
+    var s = sessao();
+    if(!p || !p.pedidoLoja || !s || !s.user_id) return;
+
+    if(p.status === 'cancelado'){
+      api('/rest/v1/rpc/cancelar_pedido', {
+        method:'POST',
+        body: JSON.stringify({p_usuario: s.user_id, p_id: p.pedidoLoja})
+      }, true).catch(function(){});
+      return;
+    }
+
+    var noSite = p.status === 'pago' || p.status === 'entregue' ? 'pago' : 'reservado';
+    api('/rest/v1/pedidos_loja?id=eq.' + encodeURIComponent(p.pedidoLoja), {
+      method:'PATCH',
+      headers:{'Prefer':'return=minimal'},
+      body: JSON.stringify({status: noSite})
+    }, true).catch(function(){});
+  }
+
   /* ---------- pedidos ---------- */
   var STATUS = {
     negociacao: 'Em negociação',
@@ -2525,10 +2643,15 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
           '<td><input type="date" class="dt" data-id="'+p.id+'" value="'+(p.data||'')+'"></td>'+
           '<td><input type="date" class="dt en" data-id="'+p.id+'" value="'+(p.entrega||'')+'"></td>'+
           '<td>'+escapa(p.cliente)+'</td>'+
-          '<td>'+escapa(p.peca)+'</td>'+
+          '<td>'+escapa(p.peca)+
+            (p.pedidoLoja ? ' <span class="sub" style="opacity:.7">· loja</span>' : '')+'</td>'+
           '<td class="n">'+p.qtd+'</td>'+
           '<td class="n">'+money(p.receita)+'</td>'+
-          '<td class="n" style="color:'+(l>=0?'var(--good)':'var(--bad)')+'">'+money(l)+'</td>'+
+          // Pedido do site entra sem custo de produção — o site não sabe quanto
+          // a peça custou. Mostrar o lucro cheio aqui seria mentira no painel.
+          '<td class="n" style="color:'+(p.custoPendente ? 'var(--warn, #d9a441)' : (l>=0?'var(--good)':'var(--bad)'))+'"'+
+            (p.custoPendente ? ' title="Custo de produção ainda não lançado — este lucro está superestimado."' : '')+'>'+
+            money(l)+(p.custoPendente ? ' *' : '')+'</td>'+
           '<td><select class="st" data-id="'+p.id+'">'+
             Object.keys(STATUS).map(function(k){
               return '<option value="'+k+'"'+(p.status===k?' selected':'')+'>'+STATUS[k]+'</option>';
@@ -2543,10 +2666,15 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     if(!id) return;
     var a = pedidos(), p = a.find(function(x){ return x.id === id; });
     if(!p) return;
-    if(el.classList.contains('st')) p.status = el.value;
+    if(el.classList.contains('st')){
+      p.status = el.value;
+      // Pedido que veio do site: cancelar aqui devolve as peças ao estoque lá.
+      avisaLojaDoStatus(p);
+    }
     else if(el.classList.contains('en')) p.entrega = el.value || '';
     else if(el.classList.contains('dt')) p.data = el.value || hojeISO();
     setPedidos(a);
+    marca('pedido', p.id);
   });
   $('tabPedidos').addEventListener('click', function(e){
     var b = e.target.closest('button[data-rm]');
@@ -4332,7 +4460,9 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       // falhar, o resto da sincronização continua: dado é mais importante
       // que foto, e quem ainda não rodou o supabase-loja.sql não pode ficar
       // sem salvar pedido por causa disso.
-      return enviaFotosDaVitrine().then(function(mudou){
+      return importaPedidosDaLoja().then(function(){
+        return enviaFotosDaVitrine();
+      }).then(function(mudou){
         if(mudou) atualizaVitrine();
       }).catch(function(e){
         erroLoja = e && e.message ? e.message : String(e);
