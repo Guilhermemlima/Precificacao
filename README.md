@@ -150,6 +150,19 @@ Quando o automático erra, dá para corrigir: **clicar na foto** fixa aquela cor
 
 Um botão desconta do estoque as gramas estimadas de cada cor.
 
+## Ajustar a foto
+
+Ao escolher a foto de um produto ou a capa de uma categoria, abre um ajuste antes de salvar. **Arraste para posicionar, use o controle para aproximar** — o quadro na tela é o mesmo quadro da vitrine, então o que estiver dentro é o que vai aparecer.
+
+Dois atalhos:
+
+- **Preencher o quadro** — a foto cobre tudo, sem borda. É como abre por padrão, e o que a maioria das fotos pede.
+- **Caber inteira** — mostra a peça do topo à base, com fundo branco nas laterais. Use quando cortar qualquer pedaço estragaria a peça.
+
+A saída é sempre quadrada, em 1600 px. Isso resolve o desalinhamento da vitrine: foto em pé e foto deitada acabam ocupando o mesmo espaço, e nenhuma delas perde a cabeça no corte.
+
+Não dá para arrastar a peça para fora do quadro: quando a foto chega na borda, ela trava.
+
 ## Publicar na loja
 
 Cada produto do catálogo tem uma caixa **Publicar na loja**. Marcada, a peça passa a aparecer no site da Moldarte 3D — com nome, descrição, categoria, foto, tamanhos e preços. Ao marcar, aparecem dois campos ao lado: **prazo de produção**, em dias úteis, e **estoque**.

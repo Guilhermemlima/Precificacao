@@ -1179,6 +1179,38 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 
 </div>
 
+<dialog id="dlgRecorte">
+  <form method="dialog" class="dlg-x"><button class="btn tiny ghost" type="submit">Cancelar</button></form>
+  <h2 class="dlg-t">Ajustar a foto</h2>
+  <p class="dlg-s">Arraste para posicionar e use o controle para aproximar. O que ficar dentro do quadro é exatamente o que aparece na loja.</p>
+
+  <div style="display:flex; justify-content:center; margin:6px 0 12px">
+    <canvas id="recorteCv" width="420" height="420"
+            style="width:min(420px,72vw); height:min(420px,72vw); border-radius:14px; cursor:grab; touch-action:none; background:#111"></canvas>
+  </div>
+
+  <div class="dlg-passo">
+    <div class="row">
+      <div class="f">
+        <label for="recorteZoom">Aproximar</label>
+        <input type="range" id="recorteZoom" min="0" max="100" value="0" style="width:100%">
+      </div>
+      <div class="f">
+        <label>Enquadramento</label>
+        <div style="display:flex; gap:7px; flex-wrap:wrap">
+          <button class="btn tiny" id="recortePreencher" type="button">Preencher o quadro</button>
+          <button class="btn tiny" id="recorteCaber" type="button">Caber inteira</button>
+        </div>
+        <span class="sub" id="recorteAviso"></span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap">
+    <button class="btn primary" id="recorteOk" type="button">Usar esta foto</button>
+  </div>
+</dialog>
+
 <dialog id="dlgPublicar">
   <form method="dialog" class="dlg-x"><button class="btn tiny ghost" type="submit">Fechar</button></form>
   <h2 class="dlg-t">Publicar na loja</h2>
@@ -3511,14 +3543,147 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     setCatalogo(cats);
   });
 
+  /* ---------- ajuste da foto antes de salvar ----------
+     Foto de peça vem em qualquer proporção: retrato de celular, panorâmica,
+     foto tirada de longe. A loja mostra tudo num quadro quadrado, então sem
+     um ajuste ou sobra espaço nas laterais, ou a peça fica pequena no meio.
+
+     Aqui você decide o enquadramento antes de salvar. O quadro na tela é o
+     mesmo quadro da vitrine — o que estiver dentro é o que vai aparecer. */
+
+  var rec = { img:null, escala:1, caber:1, preencher:1, ox:0, oy:0, alvo:null, arrastando:false, px:0, py:0 };
+  var REC_LADO = 420;
+
+  function recEscalas(){
+    rec.caber = Math.min(REC_LADO / rec.img.width, REC_LADO / rec.img.height);
+    rec.preencher = Math.max(REC_LADO / rec.img.width, REC_LADO / rec.img.height);
+  }
+  function recMax(){
+    return Math.max(rec.preencher * 3, rec.caber * 1.05);
+  }
+  function recLimita(){
+    // Impede arrastar a peça para fora: quando a imagem é menor que o quadro
+    // naquele eixo, ela fica centralizada e não se mexe.
+    var dw = rec.img.width * rec.escala, dh = rec.img.height * rec.escala;
+    var mx = Math.max(0, (dw - REC_LADO) / 2), my = Math.max(0, (dh - REC_LADO) / 2);
+    rec.ox = Math.max(-mx, Math.min(mx, rec.ox));
+    rec.oy = Math.max(-my, Math.min(my, rec.oy));
+  }
+  function recDesenha(){
+    if(!rec.img) return;
+    var cv = $('recorteCv'), ctx = cv.getContext('2d');
+    recLimita();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, REC_LADO, REC_LADO);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    var dw = rec.img.width * rec.escala, dh = rec.img.height * rec.escala;
+    ctx.drawImage(rec.img, (REC_LADO - dw)/2 + rec.ox, (REC_LADO - dh)/2 + rec.oy, dw, dh);
+
+    var sobra = dw < REC_LADO - 1 || dh < REC_LADO - 1;
+    $('recorteAviso').textContent = sobra
+      ? 'A peça inteira aparece, com fundo branco nas bordas.'
+      : 'O quadro está preenchido pela foto.';
+
+    var faixa = recMax() - rec.caber;
+    $('recorteZoom').value = faixa > 0 ? Math.round(((rec.escala - rec.caber) / faixa) * 100) : 0;
+  }
+
+  function abreRecorte(file, alvo){
+    var fr = new FileReader();
+    fr.onload = function(){
+      var im = new Image();
+      im.onload = function(){
+        rec.img = im; rec.alvo = alvo; rec.ox = 0; rec.oy = 0;
+        recEscalas();
+        // Começa preenchendo: é o enquadramento que a maioria das fotos pede,
+        // e o único que não deixa borda branca.
+        rec.escala = rec.preencher;
+        $('dlgRecorte').showModal();
+        recDesenha();
+      };
+      im.onerror = function(){ alert('Não consegui abrir essa imagem.'); };
+      im.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  }
+
+  (function ligaRecorte(){
+    var cv = $('recorteCv');
+    if(!cv) return;
+
+    cv.addEventListener('pointerdown', function(e){
+      rec.arrastando = true; rec.px = e.clientX; rec.py = e.clientY;
+      cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing';
+    });
+    cv.addEventListener('pointermove', function(e){
+      if(!rec.arrastando) return;
+      // O canvas aparece menor que sua resolução interna: converte o
+      // movimento do dedo para a escala de dentro, senão a peça foge do dedo.
+      var fator = REC_LADO / cv.getBoundingClientRect().width;
+      rec.ox += (e.clientX - rec.px) * fator;
+      rec.oy += (e.clientY - rec.py) * fator;
+      rec.px = e.clientX; rec.py = e.clientY;
+      recDesenha();
+    });
+    ['pointerup','pointercancel','pointerleave'].forEach(function(ev){
+      cv.addEventListener(ev, function(){ rec.arrastando = false; cv.style.cursor = 'grab'; });
+    });
+    cv.addEventListener('wheel', function(e){
+      if(!rec.img) return;
+      e.preventDefault();
+      var passo = e.deltaY < 0 ? 1.08 : 1/1.08;
+      rec.escala = Math.max(rec.caber, Math.min(recMax(), rec.escala * passo));
+      recDesenha();
+    }, {passive:false});
+
+    $('recorteZoom').addEventListener('input', function(){
+      if(!rec.img) return;
+      rec.escala = rec.caber + (recMax() - rec.caber) * (this.value / 100);
+      recDesenha();
+    });
+    $('recortePreencher').addEventListener('click', function(){
+      if(!rec.img) return;
+      rec.escala = rec.preencher; rec.ox = 0; rec.oy = 0; recDesenha();
+    });
+    $('recorteCaber').addEventListener('click', function(){
+      if(!rec.img) return;
+      rec.escala = rec.caber; rec.ox = 0; rec.oy = 0; recDesenha();
+    });
+
+    $('recorteOk').addEventListener('click', function(){
+      if(!rec.img || !rec.alvo) return;
+      var a = rec.alvo, lado = a.dim;
+      var cvOut = document.createElement('canvas');
+      cvOut.width = lado; cvOut.height = lado;
+      var ctx = cvOut.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, lado, lado);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      // Mesma conta da tela, só que na resolução final.
+      var k = lado / REC_LADO;
+      var dw = rec.img.width * rec.escala * k, dh = rec.img.height * rec.escala * k;
+      ctx.drawImage(rec.img, (lado - dw)/2 + rec.ox*k, (lado - dh)/2 + rec.oy*k, dw, dh);
+
+      var dado;
+      try{ dado = cvOut.toDataURL('image/jpeg', a.qualidade || 0.92); }
+      catch(err){ dado = null; }
+
+      $('dlgRecorte').close();
+      rec.img = null; rec.alvo = null;
+      if(dado) imgSalva(a.chave, dado).then(renderCatalogo);
+    });
+  })();
+
   $('fileCat').addEventListener('change', function(e){
     var f = e.target.files[0]; e.target.value = '';
     if(!f || !alvoImagem) return;
     var a = alvoImagem; alvoImagem = null;
-    processaImagem(f, a.dim, false, function(dado){
-      if(!dado) return;
-      imgSalva(a.chave, dado).then(renderCatalogo);
-    }, a.qualidade);
+    abreRecorte(f, a);
   });
 
   $('btnNovaCat').addEventListener('click', function(){
