@@ -2386,7 +2386,11 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   var imgs = { logo:load('p3d.logo') || '', foto:load('p3d.foto') || '' };
 
   // Reduz a imagem antes de guardar: foto de celular estoura o espaço do navegador.
-  function processaImagem(file, maxDim, preservaAlpha, cb){
+  //
+  // `qualidade` existe porque nem toda imagem tem o mesmo destino. A do
+  // orçamento só precisa imprimir bem num PDF; a do catálogo vai para a
+  // vitrine, onde a pessoa amplia a peça na tela antes de decidir comprar.
+  function processaImagem(file, maxDim, preservaAlpha, cb, qualidade){
     var fr = new FileReader();
     fr.onerror = function(){ cb(null); };
     fr.onload = function(){
@@ -2398,12 +2402,16 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
         cv.width = Math.max(1, Math.round(img.width * esc));
         cv.height = Math.max(1, Math.round(img.height * esc));
         var ctx = cv.getContext('2d');
+        // Reamostragem suave: sem isso, reduzir uma foto de celular deixa
+        // serrilhado nas bordas do boneco.
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         // A logo sai PNG para manter o fundo transparente; a foto sai JPEG, que ocupa
         // uma fração do espaço — PNG de foto de celular estoura a cota do navegador.
         var png = preservaAlpha && /image\/png|image\/webp|image\/svg/i.test(file.type);
         if(!png){ ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,cv.width,cv.height); }
         ctx.drawImage(img, 0, 0, cv.width, cv.height);
-        try{ cb(png ? cv.toDataURL('image/png') : cv.toDataURL('image/jpeg', 0.82)); }
+        try{ cb(png ? cv.toDataURL('image/png') : cv.toDataURL('image/jpeg', qualidade || 0.82)); }
         catch(e){ cb(null); }
       };
       img.src = fr.result;
@@ -3453,9 +3461,13 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       var alvo = d.capa !== undefined ? d.capa : d.foto;
       var parts = String(alvo).split('.');
       var cat = cats[parts[0]];
+      // A foto do produto subiu de 900 para 1600 px. O limite antigo existia
+      // porque a imagem viajava dentro do banco, em base64; agora ela vai para
+      // o Storage, onde o peso pesa muito menos. E 900 px numa tela retina
+      // aparecia esticado, com a peça borrada.
       alvoImagem = d.capa !== undefined
-        ? {chave:'c:' + cat.id, dim:1400}
-        : {chave:'p:' + cat.produtos[parts[1]].id, dim:900};
+        ? {chave:'c:' + cat.id, dim:1600, qualidade:0.9}
+        : {chave:'p:' + cat.produtos[parts[1]].id, dim:1600, qualidade:0.92};
       $('fileCat').click();
       return;
     }
@@ -3506,7 +3518,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     processaImagem(f, a.dim, false, function(dado){
       if(!dado) return;
       imgSalva(a.chave, dado).then(renderCatalogo);
-    });
+    }, a.qualidade);
   });
 
   $('btnNovaCat').addEventListener('click', function(){
