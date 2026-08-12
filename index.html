@@ -1966,6 +1966,30 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 
   var PRAZO_PADRAO = 5;
 
+  // Quanto sobrou de cada peça na loja, já descontadas as vendas. Vem do
+  // banco porque só ele sabe: aqui a gente conhece o número que foi publicado,
+  // não o que restou depois que alguém comprou.
+  function estoqueLoja(){ try{ return JSON.parse(load('p3d.estoqueLoja')||'{}'); }catch(e){ return {}; } }
+  function setEstoqueLoja(m){ store('p3d.estoqueLoja', JSON.stringify(m)); }
+
+  function buscaEstoqueDaLoja(){
+    var s = sessao();
+    if(!s || !s.user_id) return Promise.resolve(false);
+    return api('/rest/v1/rpc/estoque_disponivel', {
+      method:'POST',
+      body: JSON.stringify({p_usuario: s.user_id})
+    }, true).then(function(linhas){
+      var m = {};
+      (linhas||[]).forEach(function(l){ m[l.slug] = l.disponivel; });
+      setEstoqueLoja(m);
+      return true;
+    }).catch(function(e){
+      // Sem o supabase-estoque.sql ainda, segue sem a contagem.
+      if(window.console) console.warn('Estoque da loja não veio: ' + (e && e.message));
+      return false;
+    });
+  }
+
   function vitrine(){ try{ return JSON.parse(load('p3d.vitrine.v1')||'[]'); }catch(e){ return []; } }
   function setVitrine(a){ store('p3d.vitrine.v1', JSON.stringify(a)); }
   function fotosLoja(){ try{ return JSON.parse(load('p3d.fotosLoja')||'{}'); }catch(e){ return {}; } }
@@ -3102,6 +3126,46 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   var giros = {};
   var MODOS = {apartir:'A partir de (vários tamanhos)', unico:'Preço único', consulta:'Sob consulta'};
 
+  /* Estado do botão de sincronizar do catálogo.
+     Mora fora do HTML porque a lista é redesenhada no meio da sincronização —
+     se o texto vivesse só no elemento, o "Sincronizando…" sumiria na hora em
+     que o catálogo se redesenhasse, e o retorno se perderia. */
+  var avisoSync = '';
+
+  function rotuloSync(){
+    return avisoSync === 'indo'  ? 'Sincronizando…'
+         : avisoSync === 'ok'    ? 'No ar ✓'
+         : avisoSync === 'erro'  ? 'Falhou — veja a Nuvem'
+         : avisoSync === 'semNuvem' ? 'Conecte a nuvem'
+         : '↻ Sincronizar';
+  }
+  function pintaSync(){
+    var bs = document.querySelectorAll('[data-sincroniza]');
+    for(var i = 0; i < bs.length; i++){
+      bs[i].textContent = rotuloSync();
+      bs[i].disabled = avisoSync === 'indo';
+    }
+  }
+
+  /* Quantas unidades a loja ainda tem desta peça.
+     O campo "Estoque" ao lado é o número que VOCÊ definiu; este é o que
+     sobrou depois das vendas. Enquanto forem iguais, não vale poluir a tela
+     repetindo — o aviso só aparece quando a loja já vendeu alguma coisa. */
+  function disponivelDe(prod){
+    if(!prod.slug) return '';
+    var m = estoqueLoja();
+    if(!(prod.slug in m)) return '';
+
+    var disp = m[prod.slug];
+    var base = prod.estoque === undefined ? 999 : parseInt(prod.estoque, 10);
+    if(disp === base) return '';
+
+    var cor = disp === 0 ? 'var(--bad)' : 'var(--good)';
+    return '<span class="sub" style="color:' + cor + '; font-weight:600">' +
+      (disp === 0 ? 'esgotado na loja' : disp + ' na loja') +
+      '</span>';
+  }
+
   function renderCatalogo(){
     var cats = catalogo();
     var nProd = cats.reduce(function(k,c){ return k + (c.produtos||[]).length; }, 0);
@@ -3199,6 +3263,8 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
                     '<input type="number" min="1" max="90" style="width:58px" data-c="'+ci+'" data-p="'+pi+'" data-f="prazo" value="'+escapa(String(p.prazo||PRAZO_PADRAO))+'">dias</label>' +
                   '<label class="sub" style="display:flex; gap:5px; align-items:center">Estoque' +
                     '<input type="number" min="0" style="width:64px" data-c="'+ci+'" data-p="'+pi+'" data-f="estoque" value="'+escapa(String(p.estoque === undefined ? 999 : p.estoque))+'"></label>' +
+                  disponivelDe(p) +
+                  '<button class="btn tiny" data-sincroniza="1" type="button"'+(avisoSync==='indo'?' disabled':'')+'>'+rotuloSync()+'</button>' +
                   '<span class="sub" style="opacity:.75">/produto/'+escapa(p.slug||'')+'</span>' +
                   '<span class="sub" style="flex-basis:100%; opacity:.8">' +
                     (parseInt(p.estoque, 10) === 0
@@ -3324,6 +3390,27 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 
   var alvoImagem = null;
   $('listaCat').addEventListener('click', function(e){
+    // Sincronizar sem sair da tela: publicou, aperta aqui e já sobe.
+    if(e.target.closest('[data-sincroniza]')){
+      if(avisoSync === 'indo') return;
+
+      var volta = function(){
+        setTimeout(function(){ avisoSync = ''; pintaSync(); }, 2500);
+      };
+
+      if(!prontoParaSync()){
+        avisoSync = 'semNuvem'; pintaSync(); volta();
+        return;
+      }
+
+      avisoSync = 'indo'; pintaSync();
+      sincronizar()
+        .then(function(){ avisoSync = 'ok'; })
+        .catch(function(){ avisoSync = 'erro'; })
+        .then(function(){ pintaSync(); volta(); });
+      return;
+    }
+
     var el = e.target.closest('[data-capa],[data-foto],[data-addprod],[data-rmcat],[data-rmprod],[data-addvar],[data-rmvar],[data-sobe],[data-desce],[data-sobep],[data-descep],[data-gera]');
     if(!el) return;
     var d = el.dataset, cats = catalogo(), ix;
@@ -4464,6 +4551,8 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
         return enviaFotosDaVitrine();
       }).then(function(mudou){
         if(mudou) atualizaVitrine();
+        // Por último, para a contagem refletir o que acabou de subir.
+        return buscaEstoqueDaLoja().then(function(veio){ if(veio) renderCatalogo(); });
       }).catch(function(e){
         erroLoja = e && e.message ? e.message : String(e);
         if(window.console) console.warn('Fotos da loja não subiram: ' + erroLoja +
