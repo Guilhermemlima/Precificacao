@@ -355,11 +355,42 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 .nv-status .er{color:var(--bad); font-weight:600}
 
 /* ---------- avisos ---------- */
-#avisosN{
+#avisosN, #orcamentosN{
   display:none; margin-left:6px; font-family:var(--font-mono); font-size:11px; font-weight:700;
   background:var(--bad); color:#fff; border-radius:999px; padding:1px 6px; vertical-align:middle;
 }
-#avisosN.on{display:inline-block}
+#avisosN.on, #orcamentosN.on{display:inline-block}
+#orcamentosN{background:var(--accent)}
+
+/* ---------- orçamentos vindos do site ---------- */
+.orc{
+  background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--accent);
+  border-radius:10px; padding:14px 16px; margin-bottom:12px; box-shadow:var(--shadow);
+}
+.orc.respondido{border-left-color:var(--good); opacity:.72}
+.orc.perdido{border-left-color:var(--muted); opacity:.55}
+.orc .topo{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:8px}
+.orc .quem{font-weight:700; font-size:15px}
+.orc .quando{color:var(--muted); font-size:12px; font-family:var(--font-mono); margin-left:auto}
+.orc .specs{
+  display:flex; flex-wrap:wrap; gap:6px; margin:8px 0;
+}
+.orc .specs span{
+  background:var(--surface-2); border:1px solid var(--line); border-radius:999px;
+  padding:2px 9px; font-size:12px; color:var(--ink-2);
+}
+.orc .desc{
+  white-space:pre-wrap; color:var(--ink-2); font-size:13px; line-height:1.55;
+  background:var(--surface-2); border-radius:8px; padding:10px 12px; margin:8px 0;
+}
+.orc .arqs{display:flex; flex-wrap:wrap; gap:8px; margin:8px 0}
+.orc .arqs a{
+  display:inline-flex; align-items:center; gap:6px; font-size:12px; font-family:var(--font-mono);
+  background:var(--surface-2); border:1px solid var(--line-strong); border-radius:8px;
+  padding:5px 10px; color:var(--accent); text-decoration:none;
+}
+.orc .arqs a:hover{border-color:var(--accent)}
+.orc .acts{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px}
 .aviso{
   display:flex; gap:12px; align-items:flex-start; background:var(--surface); border:1px solid var(--line);
   border-left:3px solid var(--muted); border-radius:10px; padding:13px 15px; margin-bottom:10px; box-shadow:var(--shadow);
@@ -561,6 +592,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     <button class="tab on" id="tabCalc" type="button">Calculadora</button>
     <button class="tab" id="tabAvisos" type="button">Avisos<span id="avisosN"></span></button>
     <button class="tab" id="tabGestao" type="button">Pedidos e painel</button>
+    <button class="tab" id="tabOrcamentos" type="button">Orçamentos<span id="orcamentosN"></span></button>
     <button class="tab" id="tabCatalogo" type="button">Catálogo</button>
     <button class="tab" id="tabEstoque" type="button">Estoque e cores</button>
     <span class="tab-badge" id="tabBadge"></span>
@@ -1115,6 +1147,19 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     Cada categoria vira uma página do catálogo. A capa <b>horizontal</b> entra como faixa larga no topo; a <b>vertical</b> entra ao lado do nome. Dentro de cada produto você cadastra os tamanhos com o preço de cada um — o catálogo mostra “a partir de” pelo menor deles.
   </p>
   <div id="listaCat"></div>
+</div>
+
+<!-- ============ ORÇAMENTOS DO SITE ============ -->
+<div id="viewOrcamentos" hidden>
+  <section class="card">
+    <header>
+      <h2>Pedidos de orçamento</h2>
+      <span class="hint">quem mandou um projeto pela página de orçamento do site</span>
+    </header>
+    <div class="body">
+      <div id="listaOrcamentos"></div>
+    </div>
+  </section>
 </div>
 
 <!-- ============ ESTOQUE E CORES ============ -->
@@ -2419,6 +2464,170 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
         return false;
       });
   }
+
+  /* ---------- orçamentos vindos do site ----------
+     Diferente dos pedidos, o orçamento não vira linha na aba Pedidos: ele
+     ainda não é venda, é conversa. Fica numa lista própria até você responder
+     com preço — aí, se fechar, você lança o pedido normalmente. */
+
+  var orcamentos = [];
+
+  function buscaOrcamentos(){
+    var s = sessao();
+    if(!s || !s.user_id) return Promise.resolve(false);
+
+    return api('/rest/v1/orcamentos_loja?select=*&order=criado_em.desc&limit=100',
+               {method:'GET'}, true)
+      .then(function(linhas){
+        orcamentos = linhas || [];
+        pintaBadgeOrcamentos();
+        return true;
+      })
+      .catch(function(e){
+        // Sem a tabela ainda (supabase-orcamentos.sql não rodado), segue a vida.
+        if(window.console) console.warn('Orçamentos não vieram: ' + (e && e.message));
+        return false;
+      });
+  }
+
+  function pintaBadgeOrcamentos(){
+    var novos = orcamentos.filter(function(o){ return o.status === 'novo'; }).length;
+    var b = $('orcamentosN');
+    b.textContent = novos || '';
+    b.classList.toggle('on', novos > 0);
+  }
+
+  /**
+   * Link de download do arquivo.
+   *
+   * O balde é privado — o STL do cliente é o projeto dele, às vezes o produto
+   * inteiro do negócio dele. Cada clique pede um link novo, que vence em uma
+   * hora, em vez de existir um endereço público para sempre.
+   */
+  function baixaArquivoDeOrcamento(caminho, nome){
+    return api('/storage/v1/object/sign/orcamentos/' + caminho,
+               {method:'POST', body: JSON.stringify({expiresIn: 3600})}, true)
+      .then(function(r){
+        var a = document.createElement('a');
+        a.href = cfgNuvem().url.replace(/\/+$/, '') + '/storage/v1' + r.signedURL +
+                 '&download=' + encodeURIComponent(nome || '');
+        a.target = '_blank';
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      })
+      .catch(function(){ alert('Não consegui abrir o arquivo. Confira sua conexão e tente de novo.'); });
+  }
+
+  function mensagemDeOrcamento(o){
+    var nome = String(o.nome || '').trim().split(' ')[0] || 'tudo bem';
+    return 'Oi, ' + nome + '! Aqui é da Moldarte 3D.\n\n' +
+      'Recebi seu pedido de orçamento ' + o.id +
+      ' e já olhei o que você mandou.\n\n' +
+      'Ficaria assim:\n\n' +
+      '(preço e prazo aqui)\n\n' +
+      'Se fizer sentido, é só me confirmar que eu já coloco na fila.';
+  }
+
+  function mudaStatusDoOrcamento(id, status){
+    var o = orcamentos.filter(function(x){ return x.id === id; })[0];
+    if(!o) return;
+
+    var antes = o.status;
+    o.status = status;          // pinta agora, acerta com o banco depois
+    renderOrcamentos();
+
+    api('/rest/v1/orcamentos_loja?id=eq.' + encodeURIComponent(id), {
+      method:'PATCH',
+      headers:{'Prefer':'return=minimal'},
+      body: JSON.stringify({status: status})
+    }, true).catch(function(){
+      o.status = antes;
+      renderOrcamentos();
+      alert('Não consegui salvar essa mudança. Tente de novo.');
+    });
+  }
+
+  var ROTULO_ORC = {
+    novo: 'Novo', respondido: 'Respondido', fechado: 'Virou pedido', perdido: 'Não fechou'
+  };
+
+  function renderOrcamentos(){
+    pintaBadgeOrcamentos();
+
+    if(!orcamentos.length){
+      $('listaOrcamentos').innerHTML =
+        '<div class="tudo-certo"><div class="t">Nenhum pedido de orçamento</div>' +
+        '<div class="s">Quando alguém mandar um projeto pela página de orçamento do site, ele aparece aqui com os arquivos.</div></div>';
+      return;
+    }
+
+    $('listaOrcamentos').innerHTML = orcamentos.map(function(o){
+      var arquivos = Array.isArray(o.arquivos) ? o.arquivos : [];
+      var quando = (o.criado_em || '').slice(0, 10).split('-').reverse().join('/');
+
+      var specs = [];
+      if(o.quantidade > 1)  specs.push(o.quantidade + ' unidades');
+      if(o.material)   specs.push(o.material);
+      if(o.acabamento) specs.push(o.acabamento);
+      if(o.prazo)      specs.push(o.prazo);
+
+      var contato = [];
+      if(o.telefone) contato.push(escapa(o.telefone));
+      if(o.email)    contato.push('<a href="mailto:' + escapa(o.email) + '">' + escapa(o.email) + '</a>');
+
+      return '<div class="orc ' + escapa(o.status) + '">' +
+        '<div class="topo">' +
+          '<span class="quem">' + escapa(o.nome) + '</span>' +
+          '<span class="pill">' + (ROTULO_ORC[o.status] || o.status) + '</span>' +
+          '<span class="quando">' + escapa(o.id) + ' · ' + quando + '</span>' +
+        '</div>' +
+
+        (contato.length ? '<div class="hint">' + contato.join(' · ') + '</div>' : '') +
+        (specs.length ? '<div class="specs"><span>' + specs.map(escapa).join('</span><span>') + '</span></div>' : '') +
+        (o.descricao ? '<div class="desc">' + escapa(o.descricao) + '</div>' : '') +
+
+        (arquivos.length
+          ? '<div class="arqs">' + arquivos.map(function(a){
+              return '<a href="#" data-arq="' + escapa(a.caminho) + '" data-nome="' + escapa(a.nome) + '">' +
+                     escapa(a.nome) + ' · ' + (Number(a.tamanho||0)/1048576).toFixed(1) + ' MB</a>';
+            }).join('') + '</div>'
+          : '<div class="hint">Sem arquivo anexado — o cliente descreveu a peça.</div>') +
+
+        '<div class="acts">' +
+          (o.telefone
+            ? '<a class="btn tiny primary" href="' + escapa(linkWhatsapp(o.telefone, mensagemDeOrcamento(o))) +
+              '" target="_blank" rel="noopener">Responder no WhatsApp</a>'
+            : '') +
+          (o.status === 'novo'
+            ? '<button class="btn tiny" data-orc-resp="' + escapa(o.id) + '" type="button">Marcar como respondido</button>'
+            : '') +
+          (o.status !== 'fechado'
+            ? '<button class="btn tiny" data-orc-fech="' + escapa(o.id) + '" type="button">Virou pedido</button>'
+            : '') +
+          (o.status !== 'perdido'
+            ? '<button class="btn tiny ghost" data-orc-perd="' + escapa(o.id) + '" type="button">Não fechou</button>'
+            : '') +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  $('listaOrcamentos').addEventListener('click', function(e){
+    var arq = e.target.closest('[data-arq]');
+    if(arq){
+      e.preventDefault();
+      baixaArquivoDeOrcamento(arq.dataset.arq, arq.dataset.nome);
+      return;
+    }
+    var b = e.target.closest('[data-orc-resp]');
+    if(b) return mudaStatusDoOrcamento(b.dataset.orcResp, 'respondido');
+    b = e.target.closest('[data-orc-fech]');
+    if(b) return mudaStatusDoOrcamento(b.dataset.orcFech, 'fechado');
+    b = e.target.closest('[data-orc-perd]');
+    if(b) return mudaStatusDoOrcamento(b.dataset.orcPerd, 'perdido');
+  });
 
   // Mudou o status de um pedido que veio da loja: o site precisa saber.
   // Cancelar devolve as peças ao estoque; o resto só acompanha o status.
@@ -4665,7 +4874,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 
   /* ---------- abas ----------
      Lista única: quem adicionar aba nova mexe só aqui. */
-  var ABAS = ['calc','avisos','gestao','catalogo','estoque'];
+  var ABAS = ['calc','avisos','gestao','orcamentos','catalogo','estoque'];
   function trocaAba(qual){
     if(ABAS.indexOf(qual) < 0) qual = 'calc';
     ABAS.forEach(function(v){
@@ -4675,6 +4884,12 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     });
     if(qual === 'avisos') renderAvisos();
     if(qual === 'gestao') renderGestao();
+    if(qual === 'orcamentos'){
+      renderOrcamentos();
+      // Busca ao abrir: quem clica aqui quer ver o que chegou agora, não o
+      // que estava na tela da última sincronização.
+      buscaOrcamentos().then(renderOrcamentos);
+    }
     if(qual === 'catalogo') renderCatalogo();
     if(qual === 'estoque'){ renderEstoque(); mostraAnalise(); }
     store('p3d.aba', qual);
@@ -5050,6 +5265,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     renderEstoque();
     renderGestao();
     renderAvisos();
+    renderOrcamentos();
     renderCatalogo();
     renderLib();
     return aplicados;
@@ -5075,6 +5291,10 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       // que foto, e quem ainda não rodou o supabase-loja.sql não pode ficar
       // sem salvar pedido por causa disso.
       return importaPedidosDaLoja().then(function(){
+        // O contador na aba precisa aparecer sozinho: um orçamento que só é
+        // visto quando alguém lembra de clicar já é um orçamento atrasado.
+        return buscaOrcamentos();
+      }).then(function(){
         return enviaFotosDaVitrine();
       }).then(function(mudou){
         if(mudou) atualizaVitrine();
