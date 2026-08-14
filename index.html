@@ -1107,6 +1107,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   <div class="mes-bar">
     <button class="btn primary" type="button" id="btnNovaCat">Nova categoria</button>
     <button class="btn" type="button" id="btnCatPDF">Gerar catálogo em PDF</button>
+    <button class="btn" type="button" id="btnCupons">Cupons da loja</button>
     <span class="tab-badge" id="catResumo" style="margin-left:0"></span>
     <input type="file" id="fileCat" accept="image/*" hidden>
   </div>
@@ -1178,6 +1179,69 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 </div>
 
 </div>
+
+<dialog id="dlgCupons">
+  <form method="dialog" class="dlg-x"><button class="btn tiny ghost" type="submit">Fechar</button></form>
+  <h2 class="dlg-t">Cupons da loja</h2>
+  <p class="dlg-s">Cupom criado aqui já vale no site. Quem confere se ele é válido é o próprio banco, na hora do pedido — não dá para burlar pelo navegador.</p>
+
+  <div class="dlg-passo">
+    <div class="mini-label">Criar cupom</div>
+    <div class="row">
+      <div class="f">
+        <label for="cupCodigo">Código</label>
+        <div class="inp"><input class="txt" type="text" id="cupCodigo" placeholder="FRETEGRATIS" autocomplete="off"></div>
+        <span class="sub">Maiúscula ou minúscula dá no mesmo.</span>
+      </div>
+      <div class="f">
+        <label for="cupTipo">O que ele faz</label>
+        <div class="inp">
+          <select class="txt" id="cupTipo">
+            <option value="frete">Frete grátis</option>
+            <option value="percentual">Desconto em %</option>
+            <option value="valor">Desconto em R$</option>
+          </select>
+        </div>
+      </div>
+      <div class="f" id="cupValorBox" hidden>
+        <label for="cupValor">Valor</label>
+        <div class="inp"><input class="txt" type="number" id="cupValor" min="0" step="0.01" placeholder="10"></div>
+        <span class="sub" id="cupValorDica">em porcentagem</span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="f">
+        <label for="cupMinimo">Compra mínima (R$)</label>
+        <div class="inp"><input class="txt" type="number" id="cupMinimo" min="0" step="0.01" placeholder="0"></div>
+        <span class="sub">Deixe 0 para valer em qualquer compra.</span>
+      </div>
+      <div class="f">
+        <label for="cupValidade">Vale até</label>
+        <div class="inp"><input class="txt" type="date" id="cupValidade"></div>
+        <span class="sub">Em branco, não vence.</span>
+      </div>
+      <div class="f">
+        <label for="cupUsos">Limite de usos</label>
+        <div class="inp"><input class="txt" type="number" id="cupUsos" min="1" placeholder="sem limite"></div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="f">
+        <label for="cupDescricao">Descrição (aparece para o cliente)</label>
+        <div class="inp"><input class="txt" type="text" id="cupDescricao" placeholder="Frete grátis em qualquer compra"></div>
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px">
+      <button class="btn primary" id="btnCriarCupom" type="button">Criar cupom</button>
+      <span class="sub" id="cupAviso"></span>
+    </div>
+  </div>
+
+  <div class="dlg-passo">
+    <div class="mini-label">Cupons existentes</div>
+    <div id="listaCupons"><p class="empty">Carregando…</p></div>
+  </div>
+</dialog>
 
 <dialog id="dlgRecorte">
   <form method="dialog" class="dlg-x"><button class="btn tiny ghost" type="submit">Cancelar</button></form>
@@ -3557,6 +3621,181 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     if(d.desce !== undefined){ ix = +d.desce; if(ix < cats.length-1) cats.splice(ix+1, 0, cats.splice(ix,1)[0]); }
     setCatalogo(cats);
   });
+
+  /* ---------- cupons da loja ----------
+     Administrados daqui em vez de por SQL. O app já entra no Supabase como
+     dono da conta, e a regra da tabela deixa o dono ler e escrever os
+     próprios cupons — então não precisa de nada novo no banco.
+
+     Quem decide se um cupom vale continua sendo o banco, na hora do pedido.
+     Aqui é só o cadastro. */
+
+  var TIPOS_CUPOM = {
+    frete: 'Frete grátis',
+    percentual: 'Desconto em %',
+    valor: 'Desconto em R$'
+  };
+
+  function avisoCupom(txt, some){
+    var el = $('cupAviso');
+    if(!el) return;
+    el.textContent = txt || '';
+    if(some) setTimeout(function(){ if(el.textContent === txt) el.textContent = ''; }, 3000);
+  }
+
+  function carregaCupons(){
+    var lista = $('listaCupons');
+    if(!prontoParaSync()){
+      lista.innerHTML = '<p class="empty">Conecte a nuvem para administrar os cupons.</p>';
+      return Promise.resolve();
+    }
+
+    lista.innerHTML = '<p class="empty">Carregando…</p>';
+    return api('/rest/v1/cupons?select=*&order=criado_em.desc', {method:'GET'}, true)
+      .then(function(cs){
+        cs = cs || [];
+        if(!cs.length){
+          lista.innerHTML = '<p class="empty">Nenhum cupom ainda. Crie o primeiro acima.</p>';
+          return;
+        }
+
+        lista.innerHTML = '<table class="tbl"><thead><tr>' +
+          '<th>Código</th><th>O que faz</th><th class="n">Mínimo</th>' +
+          '<th class="n">Usos</th><th>Vale até</th><th></th></tr></thead><tbody>' +
+          cs.map(function(c){
+            var oque = c.tipo === 'frete' ? 'Frete grátis'
+              : c.tipo === 'percentual' ? num(parseNum(c.valor), 0) + '% de desconto'
+              : money(parseNum(c.valor)) + ' de desconto';
+            var usos = c.usos + (c.usos_max ? ' de ' + c.usos_max : '');
+            var venc = c.expira_em ? brData(c.expira_em) : '—';
+            var vencido = c.expira_em && c.expira_em < hojeISO();
+            var esgotado = c.usos_max && c.usos >= c.usos_max;
+
+            return '<tr' + (c.ativo && !vencido && !esgotado ? '' : ' style="opacity:.55"') + '>' +
+              '<td><b>' + escapa(c.codigo) + '</b>' +
+                (vencido ? ' <span class="sub">vencido</span>'
+                  : esgotado ? ' <span class="sub">esgotado</span>'
+                  : !c.ativo ? ' <span class="sub">desligado</span>' : '') + '</td>' +
+              '<td>' + oque + '</td>' +
+              '<td class="n">' + (parseNum(c.minimo) > 0 ? money(parseNum(c.minimo)) : '—') + '</td>' +
+              '<td class="n">' + usos + '</td>' +
+              '<td>' + venc + '</td>' +
+              '<td><div class="acts">' +
+                '<button class="btn tiny ghost" data-cupom-liga="' + escapa(c.codigo) + '" data-ativo="' + (c.ativo ? '1' : '0') + '" type="button">' +
+                  (c.ativo ? 'Desligar' : 'Ligar') + '</button>' +
+                '<button class="btn tiny ghost" data-cupom-rm="' + escapa(c.codigo) + '" type="button">Excluir</button>' +
+              '</div></td></tr>';
+          }).join('') + '</tbody></table>';
+      })
+      .catch(function(e){
+        lista.innerHTML = '<p class="empty">Não consegui carregar: ' +
+          escapa(e && e.message ? e.message : 'erro') +
+          '. Se a tabela ainda não existe, rode o supabase-cupons.sql.</p>';
+      });
+  }
+
+  function criaCupom(){
+    var s = sessao();
+    if(!s || !s.user_id){ avisoCupom('Conecte a nuvem primeiro.'); return; }
+
+    var codigo = ($('cupCodigo').value || '').trim().toUpperCase();
+    if(!codigo){ avisoCupom('Dê um código ao cupom.'); $('cupCodigo').focus(); return; }
+    if(!/^[A-Z0-9]+$/.test(codigo)){
+      avisoCupom('Use só letras e números, sem espaço nem acento.');
+      return;
+    }
+
+    var tipo = $('cupTipo').value;
+    var valor = tipo === 'frete' ? 0 : parseNum($('cupValor').value);
+    if(tipo !== 'frete' && !(valor > 0)){
+      avisoCupom('Informe o valor do desconto.'); $('cupValor').focus(); return;
+    }
+    if(tipo === 'percentual' && valor > 90){
+      avisoCupom('Percentual acima de 90% não é aceito.'); return;
+    }
+
+    var corpo = {
+      usuario: s.user_id,
+      codigo: codigo,
+      tipo: tipo,
+      valor: valor,
+      minimo: parseNum($('cupMinimo').value) || 0,
+      ativo: true,
+      expira_em: $('cupValidade').value || null,
+      usos_max: parseInt($('cupUsos').value, 10) || null,
+      descricao: ($('cupDescricao').value || '').trim() || null
+    };
+
+    avisoCupom('Criando…');
+    api('/rest/v1/cupons', {
+      method: 'POST',
+      headers: {'Prefer': 'return=minimal'},
+      body: JSON.stringify(corpo)
+    }, true).then(function(){
+      ['cupCodigo','cupValor','cupMinimo','cupValidade','cupUsos','cupDescricao']
+        .forEach(function(id){ $(id).value = ''; });
+      avisoCupom('Cupom criado.', true);
+      return carregaCupons();
+    }).catch(function(e){
+      var m = e && e.message ? e.message : 'erro';
+      // Chave repetida: o código já existe para esta conta.
+      avisoCupom(/duplicate|already exists|23505/i.test(m)
+        ? 'Já existe um cupom com esse código.'
+        : 'Não deu para criar: ' + m);
+    });
+  }
+
+  function ligaCupom(codigo, ativo){
+    return api('/rest/v1/cupons?codigo=eq.' + encodeURIComponent(codigo), {
+      method: 'PATCH',
+      headers: {'Prefer': 'return=minimal'},
+      body: JSON.stringify({ativo: !ativo})
+    }, true).then(carregaCupons);
+  }
+
+  function apagaCupom(codigo){
+    return api('/rest/v1/cupons?codigo=eq.' + encodeURIComponent(codigo), {
+      method: 'DELETE',
+      headers: {'Prefer': 'return=minimal'}
+    }, true).then(carregaCupons);
+  }
+
+  (function ligaTelaCupons(){
+    var btn = $('btnCupons');
+    if(!btn) return;
+
+    btn.addEventListener('click', function(){
+      $('dlgCupons').showModal();
+      carregaCupons();
+    });
+
+    // Só desconto em % ou R$ pede valor; frete grátis não tem o que informar.
+    $('cupTipo').addEventListener('change', function(){
+      var precisa = this.value !== 'frete';
+      $('cupValorBox').hidden = !precisa;
+      $('cupValorDica').textContent = this.value === 'percentual'
+        ? 'em porcentagem' : 'em reais';
+    });
+
+    $('btnCriarCupom').addEventListener('click', criaCupom);
+
+    $('listaCupons').addEventListener('click', function(e){
+      var liga = e.target.closest('[data-cupom-liga]');
+      if(liga){
+        liga.disabled = true;
+        ligaCupom(liga.dataset.cupomLiga, liga.dataset.ativo === '1');
+        return;
+      }
+      var rm = e.target.closest('[data-cupom-rm]');
+      if(rm){
+        var cod = rm.dataset.cupomRm;
+        // Excluir apaga o histórico de usos junto. Desligar preserva.
+        if(!confirm('Excluir o cupom ' + cod + '? Quem tentar usar vai receber "cupom não encontrado".\n\nSe quiser apenas parar de aceitá-lo, use Desligar.')) return;
+        rm.disabled = true;
+        apagaCupom(cod);
+      }
+    });
+  })();
 
   /* ---------- ajuste da foto antes de salvar ----------
      Foto de peça vem em qualquer proporção: retrato de celular, panorâmica,

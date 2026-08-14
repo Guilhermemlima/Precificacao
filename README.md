@@ -163,6 +163,22 @@ A saída é sempre quadrada, em 1600 px. Isso resolve o desalinhamento da vitrin
 
 Não dá para arrastar a peça para fora do quadro: quando a foto chega na borda, ela trava.
 
+## Cupons da loja
+
+Botão **Cupons da loja**, na aba Catálogo. Dali você cria, liga, desliga e exclui cupons sem tocar em SQL.
+
+Três tipos:
+
+- **Frete grátis** — zera o frete
+- **Desconto em %** — abate uma porcentagem dos itens (o frete continua)
+- **Desconto em R$** — abate um valor fixo
+
+Cada um aceita **compra mínima**, **validade** e **limite de usos**. A coluna *Usos* mostra quantas vezes já foi aplicado.
+
+**Desligar** para de aceitar o cupom mas mantém o histórico. **Excluir** apaga de vez, e quem tentar usar recebe "cupom não encontrado" — prefira desligar quando for uma pausa.
+
+Quem confere se o cupom vale é o banco, no momento do pedido, com o subtotal que ele mesmo calcula. Editar a tela não gera desconto.
+
 ## Publicar na loja
 
 Cada produto do catálogo tem uma caixa **Publicar na loja**. Marcada, a peça passa a aparecer no site da Moldarte 3D — com nome, descrição, categoria, foto, tamanhos e preços. Ao marcar, aparecem dois campos ao lado: **prazo de produção**, em dias úteis, e **estoque**.
