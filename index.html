@@ -2314,6 +2314,30 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     return achou || PRAZO_PADRAO;
   }
 
+  /* Abre o WhatsApp com a mensagem pronta. Semiautomático de propósito: a API
+     oficial exigiria tirar o número do aplicativo comum e usar só modelos
+     aprovados pela Meta — caro demais para o ganho, e você perde o canal de
+     atendimento que já funciona. Assim são três segundos por pedido, sem
+     risco ao número, e dá para ajustar o texto antes de enviar. */
+  function linkWhatsapp(telefone, texto){
+    var n = String(telefone || '').replace(/\D/g, '');
+    if(!n) return '';
+    // Número salvo sem o código do país não abre conversa.
+    if(n.length <= 11) n = '55' + n;
+    return 'https://wa.me/' + n + '?text=' + encodeURIComponent(texto);
+  }
+
+  function mensagemDeCobranca(p){
+    var nome = String(p.cliente || '').trim().split(' ')[0] || 'tudo bem';
+    var txt = 'Oi, ' + nome + '! Aqui é da Moldarte 3D.\n\n' +
+      'Seu pedido ' + (p.pedidoLoja || p.id) + ' (' + p.peca + ') está reservado ' +
+      'e é só o pagamento para a gente começar a produzir.\n\n' +
+      'Valor: ' + money(p.receita);
+    if(p.pagamentoUrl) txt += '\n\nPode pagar por aqui (Pix, boleto ou cartão):\n' + p.pagamentoUrl;
+    txt += '\n\nQualquer dúvida é só me chamar!';
+    return txt;
+  }
+
   function statusLocalDe(s){
     if(s === 'pago') return 'pago';
     if(s === 'cancelado' || s === 'expirado') return 'cancelado';
@@ -2334,6 +2358,11 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       // Id derivado do pedido do site: reimportar nunca duplica.
       id: 'loja-' + pl.id,
       pedidoLoja: pl.id,
+      // Guardados para a cobrança por WhatsApp: sem eles seria preciso voltar
+      // ao Supabase para descobrir o telefone e o link de pagamento.
+      telefone: (pl.cliente && pl.cliente.telefone) || '',
+      pagamentoUrl: pl.pagamento_url || '',
+      expiraEm: pl.expira_em || '',
       data: data,
       entrega: addDias(data, prazo),
       gramas: 0,
@@ -2800,7 +2829,15 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
               return '<option value="'+k+'"'+(p.status===k?' selected':'')+'>'+STATUS[k]+'</option>';
             }).join('')+
           '</select></td>'+
-          '<td><div class="acts"><button class="btn tiny ghost" data-rm="'+p.id+'" type="button">Excluir</button></div></td></tr>';
+          '<td><div class="acts">' +
+            // Cobrar quem ainda não pagou, sem sair da tela nem procurar o
+            // contato: um toque abre a conversa com a mensagem escrita.
+            (p.telefone && p.status === 'aguardando'
+              ? '<a class="btn tiny" href="' + escapa(linkWhatsapp(p.telefone, mensagemDeCobranca(p))) +
+                '" target="_blank" rel="noopener" title="Abrir o WhatsApp com a cobrança pronta">Cobrar</a>'
+              : '') +
+            '<button class="btn tiny ghost" data-rm="'+p.id+'" type="button">Excluir</button>' +
+          '</div></td></tr>';
       }).join('') + '</tbody>';
   }
 
@@ -4493,6 +4530,41 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     var envio = Math.max(0, val('diasEnvio'));
     var antec = Math.max(0, val('diasAlerta'));
     var abertos = pedidos().filter(emAberto);
+
+    /* Pedidos da loja esperando pagamento. Sem isso a venda vinda do site
+       ficava esperando alguém lembrar de olhar a aba Pedidos — e a reserva de
+       estoque vence em 24 horas. */
+    pedidos().forEach(function(p){
+      if(!p.pedidoLoja || p.status !== 'aguardando') return;
+
+      var horas = p.expiraEm
+        ? Math.floor((new Date(p.expiraEm) - new Date()) / 3600000)
+        : null;
+
+      // Vencida: o estoque já voltou para a loja sozinho.
+      if(horas !== null && horas < 0){
+        av.push({ch:'venc-'+p.id, nivel:'info', ico:'prazo',
+          tt:'Reserva vencida sem pagamento',
+          dd:'<b>'+escapa(p.cliente)+'</b> não pagou o pedido <b>'+escapa(p.pedidoLoja)+'</b> ' +
+             'no prazo, e as peças voltaram para a loja. Se ainda quiser vender, ' +
+             'chame no WhatsApp e gere a cobrança de novo.'});
+        return;
+      }
+
+      var apertado = horas !== null && horas <= 6;
+      av.push({
+        ch:'pag-'+p.id,
+        nivel: apertado ? 'critico' : 'atencao',
+        ico: apertado ? (horas + 'h') : 'novo',
+        tt: apertado ? 'Reserva vencendo' : 'Venda aguardando pagamento',
+        dd:'<b>'+escapa(p.cliente)+'</b> fez o pedido <b>'+escapa(p.pedidoLoja)+'</b> ' +
+           '(' + escapa(p.peca) + ') por <b>'+money(p.receita)+'</b>' +
+           (horas !== null ? ', e a reserva vence em <b>'+horas+'h</b>' : '') + '. ' +
+           (p.telefone
+             ? '<a href="'+escapa(linkWhatsapp(p.telefone, mensagemDeCobranca(p)))+'" target="_blank" rel="noopener"><b>Cobrar pelo WhatsApp</b></a>.'
+             : 'Sem telefone informado.')
+      });
+    });
 
     abertos.forEach(function(p){
       var nome = p.peca + ' · ' + p.cliente;
