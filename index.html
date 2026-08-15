@@ -1160,6 +1160,16 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       <div id="listaOrcamentos"></div>
     </div>
   </section>
+
+  <section class="card">
+    <header>
+      <h2>Avaliações</h2>
+      <span class="hint">nada aparece no site antes de você liberar</span>
+    </header>
+    <div class="body">
+      <div id="listaAvaliacoes"></div>
+    </div>
+  </section>
 </div>
 
 <!-- ============ ESTOQUE E CORES ============ -->
@@ -1406,6 +1416,13 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       </div>
     </div>
     <p class="note">Sem isto a loja continua se atualizando sozinha, só que leva até meio minuto. Preenchendo, ela é avisada assim que você sincroniza e a mudança aparece quase na hora. A chave é qualquer texto que você invente — precisa ser o mesmo aqui e na variável <b>REVALIDATE_SECRET</b> da Vercel.</p>
+    <div class="row" style="margin-top:10px">
+      <div class="f">
+        <label for="nvCron">Chave dos e-mails</label>
+        <div class="inp"><input class="txt" type="password" id="nvCron" placeholder="a mesma do CRON_SECRET" autocomplete="off"></div>
+      </div>
+    </div>
+    <p class="note">Só é usada para o botão <b>Avisar a lista</b>, que manda o e-mail de peça nova para quem se cadastrou no site. É outra chave, a mesma da variável <b>CRON_SECRET</b> da Vercel — sem ela o botão não aparece.</p>
   </div>
 
   <div class="dlg-passo">
@@ -2385,6 +2402,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 
   function statusLocalDe(s){
     if(s === 'pago') return 'pago';
+    if(s === 'entregue') return 'entregue';
     if(s === 'cancelado' || s === 'expirado') return 'cancelado';
     return 'aguardando';
   }
@@ -2491,7 +2509,11 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   }
 
   function pintaBadgeOrcamentos(){
-    var novos = orcamentos.filter(function(o){ return o.status === 'novo'; }).length;
+    // Conta as duas coisas que a aba guarda: orçamento sem resposta e
+    // avaliação esperando ser liberada. Duas contagens em abas separadas
+    // seriam duas coisas para lembrar de olhar.
+    var novos = orcamentos.filter(function(o){ return o.status === 'novo'; }).length +
+                avaliacoes.filter(function(a){ return !a.aprovada; }).length;
     var b = $('orcamentosN');
     b.textContent = novos || '';
     b.classList.toggle('on', novos > 0);
@@ -2629,6 +2651,103 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     if(b) return mudaStatusDoOrcamento(b.dataset.orcPerd, 'perdido');
   });
 
+  /* ---------- avaliações ----------
+     Toda avaliação chega escondida e você libera. Não é para escolher nota:
+     é para segurar spam e o dado pessoal que a pessoa às vezes escreve sem
+     perceber no meio do texto — telefone, endereço, nome inteiro. */
+
+  var avaliacoes = [];
+
+  function buscaAvaliacoes(){
+    var s = sessao();
+    if(!s || !s.user_id) return Promise.resolve(false);
+
+    return api('/rest/v1/avaliacoes?select=*&order=criado_em.desc&limit=100',
+               {method:'GET'}, true)
+      .then(function(linhas){
+        avaliacoes = linhas || [];
+        pintaBadgeOrcamentos();
+        return true;
+      })
+      .catch(function(e){
+        if(window.console) console.warn('Avaliações não vieram: ' + (e && e.message));
+        return false;
+      });
+  }
+
+  function mudaAvaliacao(id, campos, remover){
+    var i = avaliacoes.findIndex(function(a){ return a.id === id; });
+    if(i < 0) return;
+
+    var copia = avaliacoes[i];
+    if(remover) avaliacoes.splice(i, 1);
+    else avaliacoes[i] = Object.assign({}, copia, campos);
+    renderAvaliacoes();
+
+    var caminho = '/rest/v1/avaliacoes?id=eq.' + encodeURIComponent(id);
+    var req = remover
+      ? api(caminho, {method:'DELETE', headers:{'Prefer':'return=minimal'}}, true)
+      : api(caminho, {method:'PATCH', headers:{'Prefer':'return=minimal'},
+                      body: JSON.stringify(campos)}, true);
+
+    req.catch(function(){
+      if(remover) avaliacoes.splice(i, 0, copia);
+      else avaliacoes[i] = copia;
+      renderAvaliacoes();
+      alert('Não consegui salvar essa mudança. Tente de novo.');
+    });
+  }
+
+  function estrelas(n){
+    return '★★★★★'.slice(0, n) + '<span style="color:var(--line-strong)">' +
+           '★★★★★'.slice(0, 5 - n) + '</span>';
+  }
+
+  function renderAvaliacoes(){
+    pintaBadgeOrcamentos();
+
+    if(!avaliacoes.length){
+      $('listaAvaliacoes').innerHTML =
+        '<div class="tudo-certo"><div class="t">Nenhuma avaliação ainda</div>' +
+        '<div class="s">O convite sai sozinho dois dias depois de você marcar o pedido como <b>entregue</b>.</div></div>';
+      return;
+    }
+
+    $('listaAvaliacoes').innerHTML = avaliacoes.map(function(a){
+      var quando = (a.criado_em || '').slice(0, 10).split('-').reverse().join('/');
+
+      return '<div class="orc ' + (a.aprovada ? 'respondido' : '') + '">' +
+        '<div class="topo">' +
+          '<span class="quem">' + escapa(a.nome) + '</span>' +
+          '<span style="color:var(--accent); letter-spacing:1px">' + estrelas(a.nota) + '</span>' +
+          '<span class="pill">' + (a.aprovada ? 'No site' : 'Esperando você') + '</span>' +
+          '<span class="quando">' + escapa(a.slug) + ' · ' + quando + '</span>' +
+        '</div>' +
+
+        (a.comentario ? '<div class="desc">' + escapa(a.comentario) + '</div>'
+                      : '<div class="hint">Só a nota, sem comentário.</div>') +
+
+        '<div class="acts">' +
+          (a.aprovada
+            ? '<button class="btn tiny ghost" data-av-esconde="' + a.id + '" type="button">Tirar do site</button>'
+            : '<button class="btn tiny primary" data-av-libera="' + a.id + '" type="button">Publicar no site</button>') +
+          '<button class="btn tiny ghost" data-av-apaga="' + a.id + '" type="button">Excluir</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  $('listaAvaliacoes').addEventListener('click', function(e){
+    var b = e.target.closest('[data-av-libera]');
+    if(b) return mudaAvaliacao(+b.dataset.avLibera, {aprovada:true});
+    b = e.target.closest('[data-av-esconde]');
+    if(b) return mudaAvaliacao(+b.dataset.avEsconde, {aprovada:false});
+    b = e.target.closest('[data-av-apaga]');
+    if(b && confirm('Excluir esta avaliação? Não dá para desfazer.')){
+      return mudaAvaliacao(+b.dataset.avApaga, null, true);
+    }
+  });
+
   // Mudou o status de um pedido que veio da loja: o site precisa saber.
   // Cancelar devolve as peças ao estoque; o resto só acompanha o status.
   function avisaLojaDoStatus(p){
@@ -2643,7 +2762,11 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       return;
     }
 
-    var noSite = p.status === 'pago' || p.status === 'entregue' ? 'pago' : 'reservado';
+    // "entregue" vai como entregue, não como pago. É esse status que dispara o
+    // convite para avaliar — juntar os dois deixaria o convite sem gatilho.
+    var noSite = p.status === 'entregue' ? 'entregue'
+               : p.status === 'pago'     ? 'pago'
+               : 'reservado';
     api('/rest/v1/pedidos_loja?id=eq.' + encodeURIComponent(p.pedidoLoja), {
       method:'PATCH',
       headers:{'Prefer':'return=minimal'},
@@ -3531,6 +3654,83 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       '</span>';
   }
 
+  /**
+   * Manda o e-mail de peça nova para quem se cadastrou no site.
+   *
+   * Pergunta antes de enviar, e diz quantas pessoas vão receber. E-mail para
+   * uma lista é o tipo de coisa que não tem "desfazer": mandado, foi. A
+   * pergunta custa dois segundos e evita disparar sem querer, ou disparar duas
+   * vezes a mesma novidade.
+   */
+  function avisaListaDeNovidades(prod, cat, botao){
+    var c = cfgNuvem();
+    if(!c.loja || !c.cronChave){
+      alert('Falta o endereço da loja ou a chave dos e-mails. Preencha em Nuvem.');
+      return;
+    }
+
+    var linha = vitrine().filter(function(v){ return v.nome === (prod.nome||'').trim(); })[0];
+    if(!linha){
+      alert('Esta peça ainda não chegou na loja. Sincronize primeiro e tente de novo.');
+      return;
+    }
+
+    var antes = botao.textContent;
+    botao.disabled = true;
+    botao.textContent = 'Conferindo...';
+
+    var corpo = {
+      slug: linha.slug,
+      nome: linha.nome,
+      descricao: linha.descricao,
+      preco: linha.preco,
+      imagem: linha.foto
+    };
+
+    function chama(extra){
+      return fetch(c.loja + '/api/novidade', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'x-cron-secret': c.cronChave},
+        body: JSON.stringify(Object.assign({}, corpo, extra))
+      }).then(function(r){
+        return r.json().then(function(j){
+          if(!r.ok || !j.ok) throw new Error(j.recado || ('a loja respondeu ' + r.status));
+          return j;
+        });
+      });
+    }
+
+    // Primeiro só conta; depois pergunta; só então manda.
+    chama({simular:true}).then(function(j){
+      botao.textContent = antes;
+      botao.disabled = false;
+
+      if(!j.quantos){
+        alert('Ninguém se cadastrou para as novidades ainda, então não há para quem mandar.');
+        return;
+      }
+
+      var ok = confirm(
+        'Mandar o aviso de "' + linha.nome + '" para ' + j.quantos +
+        (j.quantos === 1 ? ' pessoa' : ' pessoas') + '?\n\n' +
+        'E-mail enviado não volta atrás.'
+      );
+      if(!ok) return;
+
+      botao.disabled = true;
+      botao.textContent = 'Enviando...';
+      return chama({}).then(function(f){
+        botao.textContent = f.enviados + ' enviados';
+        setTimeout(function(){ botao.textContent = antes; botao.disabled = false; }, 2600);
+      });
+    }).catch(function(err){
+      botao.textContent = antes;
+      botao.disabled = false;
+      alert('Não consegui avisar a lista: ' + (err && err.message) +
+            '\n\nConfira se a chave é a mesma do CRON_SECRET da Vercel.');
+    });
+  }
+
   function renderCatalogo(){
     var cats = catalogo();
     var nProd = cats.reduce(function(k,c){ return k + (c.produtos||[]).length; }, 0);
@@ -3572,6 +3772,13 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
               cats.map(function(o, oi){ return oi === ci ? '' : '<option value="v:'+oi+'">'+escapa(o.nome || 'Categoria '+(oi+1))+'</option>'; }).join('') +
             '</optgroup>' +
           '</select>' +
+          // Manual de propósito: publicar é coisa que se faz várias vezes por
+          // peça (ajusta preço, troca foto, republica). Se o e-mail saísse a
+          // cada publicação, a lista receberia a mesma novidade cinco vezes.
+          (!p.link && p.pub && cfgNuvem().cronChave
+            ? '<button class="btn tiny" data-novidade='+alvo+' type="button" ' +
+              'title="Mandar o e-mail de lançamento para quem se cadastrou">Avisar a lista</button>'
+            : '') +
           '<button class="btn tiny ghost" data-rmprod='+alvo+' type="button">Excluir</button>' +
         '</div>';
 
@@ -3776,9 +3983,16 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       return;
     }
 
-    var el = e.target.closest('[data-capa],[data-foto],[data-addprod],[data-rmcat],[data-rmprod],[data-addvar],[data-rmvar],[data-sobe],[data-desce],[data-sobep],[data-descep],[data-gera]');
+    var el = e.target.closest('[data-capa],[data-foto],[data-addprod],[data-rmcat],[data-rmprod],[data-addvar],[data-rmvar],[data-sobe],[data-desce],[data-sobep],[data-descep],[data-gera],[data-novidade]');
     if(!el) return;
     var d = el.dataset, cats = catalogo(), ix;
+
+    if(d.novidade !== undefined){
+      ix = d.novidade.split('.');
+      var cNov = cats[ix[0]], pNov = cNov && cNov.produtos[ix[1]];
+      if(pNov) avisaListaDeNovidades(pNov, cNov, el);
+      return;
+    }
 
     if(d.gera !== undefined){
       ix = d.gera.split('.');
@@ -4886,9 +5100,11 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     if(qual === 'gestao') renderGestao();
     if(qual === 'orcamentos'){
       renderOrcamentos();
+      renderAvaliacoes();
       // Busca ao abrir: quem clica aqui quer ver o que chegou agora, não o
       // que estava na tela da última sincronização.
       buscaOrcamentos().then(renderOrcamentos);
+      buscaAvaliacoes().then(renderAvaliacoes);
     }
     if(qual === 'catalogo') renderCatalogo();
     if(qual === 'estoque'){ renderEstoque(); mostraAnalise(); }
@@ -5266,6 +5482,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     renderGestao();
     renderAvisos();
     renderOrcamentos();
+    renderAvaliacoes();
     renderCatalogo();
     renderLib();
     return aplicados;
@@ -5292,8 +5509,9 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       // sem salvar pedido por causa disso.
       return importaPedidosDaLoja().then(function(){
         // O contador na aba precisa aparecer sozinho: um orçamento que só é
-        // visto quando alguém lembra de clicar já é um orçamento atrasado.
-        return buscaOrcamentos();
+        // visto quando alguém lembra de clicar já é um orçamento atrasado. O
+        // mesmo vale para avaliação esperando liberação.
+        return Promise.all([buscaOrcamentos(), buscaAvaliacoes()]);
       }).then(function(){
         return enviaFotosDaVitrine();
       }).then(function(mudou){
@@ -5417,7 +5635,8 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       url: $('nvUrl').value.trim(),
       key: $('nvKey').value.trim(),
       loja: $('nvLoja').value.trim().replace(/\/+$/, ''),
-      lojaChave: $('nvLojaChave').value.trim()
+      lojaChave: $('nvLojaChave').value.trim(),
+      cronChave: $('nvCron').value.trim()
     });
   }
   function comBotao(btn, rotulo, promessa){
@@ -5440,6 +5659,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     $('nvKey').value = c.key || '';
     $('nvLoja').value = c.loja || '';
     $('nvLojaChave').value = c.lojaChave || '';
+    $('nvCron').value = c.cronChave || '';
     if(s && s.email) $('nvEmail').value = s.email;
     statusNuvem();
     $('dlgNuvem').showModal();
