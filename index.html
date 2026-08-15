@@ -1235,6 +1235,13 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 
 </div>
 
+<dialog id="dlgPedido">
+  <form method="dialog" class="dlg-x"><button class="btn tiny ghost" type="submit">Fechar</button></form>
+  <h2 class="dlg-t" id="pedTitulo">Pedido</h2>
+  <p class="dlg-s" id="pedSub"></p>
+  <div id="pedCorpo"></div>
+</dialog>
+
 <dialog id="dlgCupons">
   <form method="dialog" class="dlg-x"><button class="btn tiny ghost" type="submit">Fechar</button></form>
   <h2 class="dlg-t">Cupons da loja</h2>
@@ -2651,6 +2658,146 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     if(b) return mudaStatusDoOrcamento(b.dataset.orcPerd, 'perdido');
   });
 
+  /* ---------- detalhes do pedido do site ----------
+     Busca no banco em vez de usar o que foi importado. Duas razões: os pedidos
+     que já entraram aqui antes não guardaram endereço nem observação, e o
+     status do pagamento pode ter mudado desde a última sincronização. */
+
+  function enderecoEmTexto(e){
+    e = e || {};
+    var linhas = [
+      [e.rua, e.numero].filter(Boolean).join(', '),
+      e.complemento,
+      e.bairro,
+      [e.cidade, e.uf].filter(Boolean).join(' - '),
+      e.cep
+    ].filter(Boolean);
+    return linhas.join('\n');
+  }
+
+  function bloco(titulo, conteudo){
+    if(!conteudo) return '';
+    return '<div class="dlg-passo"><div class="mini-label">' + titulo + '</div>' +
+           conteudo + '</div>';
+  }
+
+  function linhaInfo(rotulo, valor){
+    if(!valor) return '';
+    return '<div style="display:flex; gap:10px; padding:3px 0; font-size:13px">' +
+      '<span style="color:var(--muted); min-width:104px">' + rotulo + '</span>' +
+      '<span style="color:var(--ink)">' + valor + '</span></div>';
+  }
+
+  function abreDetalhesDoPedido(idLoja){
+    $('pedTitulo').textContent = 'Pedido ' + idLoja;
+    $('pedSub').textContent = 'Buscando...';
+    $('pedCorpo').innerHTML = '';
+    $('dlgPedido').showModal();
+
+    api('/rest/v1/pedidos_loja?select=*&id=eq.' + encodeURIComponent(idLoja) + '&limit=1',
+        {method:'GET'}, true)
+      .then(function(linhas){
+        var p = (linhas || [])[0];
+        if(!p){ $('pedSub').textContent = 'Não achei este pedido no banco.'; return; }
+
+        var c = p.cliente || {}, e = p.entrega || {};
+        var itens = Array.isArray(p.itens) ? p.itens : [];
+        var endereco = enderecoEmTexto(e);
+
+        $('pedSub').textContent =
+          (p.criado_em || '').slice(0,10).split('-').reverse().join('/') +
+          ' · ' + (STATUS[statusLocalDe(p.status)] || p.status) +
+          ' · ' + money(parseNum(p.total));
+
+        var htmlItens = itens.map(function(i){
+          // Cor e material escolhidos na página do produto. Ficavam guardados
+          // no pedido e ninguém via — e é o que decide qual filamento entra.
+          var escolhas = [];
+          if(i.opcoes && typeof i.opcoes === 'object'){
+            Object.keys(i.opcoes).forEach(function(k){
+              if(i.opcoes[k]) escolhas.push(escapa(k) + ': ' + escapa(i.opcoes[k]));
+            });
+          }
+
+          return '<tr>' +
+            '<td>' + (i.quantidade || 1) + '× ' + escapa(i.nome || i.slug || 'peça') +
+              (i.tamanho && i.tamanho !== 'Único' ? ' <span class="sub">(' + escapa(i.tamanho) + ')</span>' : '') +
+              (escolhas.length
+                ? '<br><span class="sub" style="color:var(--accent)">' + escolhas.join(' · ') + '</span>'
+                : '') +
+            '</td>' +
+            '<td class="n">' + money(parseNum(i.total)) + '</td>' +
+          '</tr>';
+        }).join('');
+
+        var contas =
+          '<tr><td>Subtotal</td><td class="n">' + money(parseNum(p.subtotal)) + '</td></tr>' +
+          (parseNum(p.desconto) > 0
+            ? '<tr><td>Desconto' + (p.cupom ? ' (' + escapa(p.cupom) + ')' : '') +
+              '</td><td class="n" style="color:var(--good)">− ' + money(parseNum(p.desconto)) + '</td></tr>'
+            : '') +
+          '<tr><td>Frete</td><td class="n">' +
+            (parseNum(p.frete) > 0 ? money(parseNum(p.frete)) : 'grátis') + '</td></tr>' +
+          '<tr><td><b>Total</b></td><td class="n"><b>' + money(parseNum(p.total)) + '</b></td></tr>';
+
+        $('pedCorpo').innerHTML =
+          bloco('Cliente',
+            linhaInfo('Nome', escapa(c.nome || '—')) +
+            linhaInfo('E-mail', c.email ? '<a href="mailto:'+escapa(c.email)+'">'+escapa(c.email)+'</a>' : '') +
+            linhaInfo('Telefone', c.telefone
+              ? escapa(c.telefone) + ' · <a href="' + escapa(linkWhatsapp(c.telefone, '')) +
+                '" target="_blank" rel="noopener">WhatsApp</a>'
+              : '') +
+            linhaInfo('CPF/CNPJ', escapa(c.documento || ''))
+          ) +
+
+          bloco('Entrega',
+            (endereco
+              ? '<pre style="margin:0; font-family:inherit; font-size:13px; line-height:1.6; white-space:pre-wrap; color:var(--ink)">' +
+                escapa(endereco) + '</pre>' +
+                '<button class="btn tiny" id="pedCopiaEnd" type="button" style="margin-top:8px">Copiar endereço</button>'
+              : '<p class="note">Sem endereço — pode ser retirada.</p>')
+          ) +
+
+          // O que a pessoa escreveu. Fica em destaque de propósito: é aqui que
+          // vem "quero na pose do Fifa", e ler isso depois de imprimir não
+          // adianta nada.
+          (p.observacoes
+            ? bloco('Observações do cliente',
+                '<div style="white-space:pre-wrap; font-size:13px; line-height:1.6; color:var(--ink); ' +
+                'background:var(--surface-2); border-left:3px solid var(--accent); border-radius:8px; padding:11px 13px">' +
+                escapa(p.observacoes) + '</div>')
+            : '') +
+
+          bloco('Itens',
+            '<table class="tb"><tbody>' + htmlItens + contas + '</tbody></table>') +
+
+          bloco('Pagamento',
+            linhaInfo('Forma escolhida', escapa(p.pagamento || '—')) +
+            linhaInfo('Pago em', p.pago_em ? (p.pago_em || '').slice(0,10).split('-').reverse().join('/') : '') +
+            linhaInfo('Reserva vence', p.expira_em
+              ? new Date(p.expira_em).toLocaleString('pt-BR')
+              : '') +
+            (p.pagamento_url
+              ? '<a class="btn tiny" href="' + escapa(p.pagamento_url) + '" target="_blank" rel="noopener" ' +
+                'style="margin-top:8px">Abrir a cobrança</a>'
+              : '<p class="note">Sem cobrança gerada — o acerto foi combinado por fora.</p>')
+          );
+
+        var btn = $('pedCopiaEnd');
+        if(btn) btn.addEventListener('click', function(){
+          // Endereço com o nome junto: é assim que vai para a etiqueta.
+          navigator.clipboard.writeText((c.nome || '') + '\n' + endereco).then(function(){
+            btn.textContent = 'Copiado';
+            setTimeout(function(){ btn.textContent = 'Copiar endereço'; }, 1600);
+          });
+        });
+      })
+      .catch(function(err){
+        $('pedSub').textContent = 'Não consegui buscar: ' + (err && err.message);
+      });
+  }
+
   /* ---------- avaliações ----------
      Toda avaliação chega escondida e você libera. Não é para escolher nota:
      é para segurar spam e o dado pessoal que a pessoa às vezes escreve sem
@@ -3168,6 +3315,12 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
               ? '<a class="btn tiny" href="' + escapa(linkWhatsapp(p.telefone, mensagemDeCobranca(p))) +
                 '" target="_blank" rel="noopener" title="Abrir o WhatsApp com a cobrança pronta">Cobrar</a>'
               : '') +
+            // Endereço, observações e itens moram no banco, não aqui. Sem este
+            // botão era preciso abrir o Supabase para saber para onde enviar.
+            (p.pedidoLoja
+              ? '<button class="btn tiny" data-det="'+escapa(p.pedidoLoja)+'" type="button" ' +
+                'title="Endereço, observações e itens do pedido">Detalhes</button>'
+              : '') +
             '<button class="btn tiny ghost" data-rm="'+p.id+'" type="button">Excluir</button>' +
           '</div></td></tr>';
       }).join('') + '</tbody>';
@@ -3189,6 +3342,9 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     marca('pedido', p.id);
   });
   $('tabPedidos').addEventListener('click', function(e){
+    var det = e.target.closest('button[data-det]');
+    if(det) return abreDetalhesDoPedido(det.dataset.det);
+
     var b = e.target.closest('button[data-rm]');
     if(!b) return;
     setPedidos(pedidos().filter(function(p){ return p.id !== b.dataset.rm; }));
