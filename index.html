@@ -443,6 +443,22 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   font-size:10px; color:var(--muted); text-align:center; padding:4px; cursor:pointer;
 }
 .prod-foto img{width:100%; height:100%; object-fit:contain; display:block}
+
+/* Galeria: a principal em cima, as outras menores embaixo. */
+.prod-fotos{display:flex; flex-direction:column; gap:5px; flex:none}
+.prod-extras{display:flex; gap:5px; flex-wrap:wrap; width:82px}
+.prod-foto.extra{
+  width:38px; height:38px; border-radius:5px; font-size:16px; color:var(--muted);
+  position:relative; padding:2px;
+}
+.prod-foto.extra:hover{border-color:var(--accent); color:var(--accent)}
+.tira-foto{
+  position:absolute; top:-5px; right:-5px; width:16px; height:16px; line-height:1;
+  border-radius:50%; border:1px solid var(--line-strong); background:var(--surface-2);
+  color:var(--muted); font-size:12px; cursor:pointer; padding:0; display:none;
+}
+.prod-foto.extra:hover .tira-foto{display:block}
+.tira-foto:hover{color:var(--bad); border-color:var(--bad)}
 .prod-campos{flex:1; min-width:230px; display:flex; flex-direction:column; gap:7px}
 .prod-campos textarea{font-size:13px; min-height:44px; line-height:1.45}
 .prod-campos input[type=text], .prod-campos select{
@@ -2146,6 +2162,11 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 
   var PRAZO_PADRAO = 5;
 
+  /* Quantas fotos uma peça pode ter na loja, contando a principal.
+     Cinco cobre frente, costas, base, detalhe e a peça na mão — mais que
+     isso ninguém rola até o fim. */
+  var MAX_FOTOS = 5;
+
   // Quanto sobrou de cada peça na loja, já descontadas as vendas. Vem do
   // banco porque só ele sabe: aqui a gente conhece o número que foi publicado,
   // não o que restou depois que alguém comprou.
@@ -2283,6 +2304,18 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
           // Leve mais, pague menos por unidade — as faixas da calculadora.
           faixas: consulta ? [] : escadaDeQuantidade(base),
           foto: fotos['p:' + prod.id] ? fotos['p:' + prod.id].url : '',
+          // A galeria, na ordem: principal primeiro, depois as extras. O
+          // campo `foto` continua existindo para não quebrar nada que já
+          // esteja publicado.
+          fotos: (function(){
+            var lista = [];
+            if(fotos['p:' + prod.id]) lista.push(fotos['p:' + prod.id].url);
+            for(var n = 2; n <= MAX_FOTOS; n++){
+              var f = fotos['p:' + prod.id + '#' + n];
+              if(f) lista.push(f.url);
+            }
+            return lista;
+          })(),
           capaCategoria: fotos['c:' + cat.id] ? fotos['c:' + cat.id].url : '',
           universo: (prod.universo||'').trim(),
           estilo: (prod.estilo||'').trim(),
@@ -2334,7 +2367,10 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       var temPublicado = (cat.produtos||[]).some(function(p){ return p.pub && !p.link; });
       if(temPublicado) agenda('c:' + cat.id, 'capas');
       (cat.produtos||[]).forEach(function(prod){
-        if(prod.pub && !prod.link) agenda('p:' + prod.id, 'produtos');
+        if(!prod.pub || prod.link) return;
+        agenda('p:' + prod.id, 'produtos');
+        // As fotos extras sobem pelo mesmo caminho da principal.
+        for(var n = 2; n <= MAX_FOTOS; n++) agenda('p:' + prod.id + '#' + n, 'produtos');
       });
     });
 
@@ -4006,8 +4042,33 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
             '<input type="text" class="p" data-c="'+ci+'" data-p="'+pi+'" data-v="'+vi+'" data-f="p" value="'+escapa(v.p)+'" placeholder="0,00" inputmode="decimal">' +
             '<button class="btn tiny ghost" data-rmvar="'+ci+'.'+pi+'.'+vi+'" type="button">×</button></div>';
         }).join('');
+        // Fotos extras. Quem compra um colecionável quer ver as costas, a
+        // base e o tamanho na mão — uma foto só deixa a decisão pela metade.
+        // A principal continua em 'p:<id>'; as outras entram como
+        // 'p:<id>#2', '#3'… então catálogo antigo continua valendo.
+        var extras = '';
+        if(!p.link){
+          for(var ex = 2; ex <= MAX_FOTOS; ex++){
+            var chaveEx = rs.chave + '#' + ex;
+            var fotoEx = img(chaveEx);
+            // Mostra os preenchidos e só o próximo vazio, para não virar uma
+            // fileira de quadrados cinzas.
+            if(!fotoEx && ex > 2 && !img(rs.chave + '#' + (ex - 1))) break;
+            extras += '<div class="prod-foto extra" data-fotox="'+ci+'.'+pi+'.'+ex+'" ' +
+              'title="' + (fotoEx ? 'Trocar esta foto' : 'Adicionar outra foto') + '">' +
+              (fotoEx
+                ? '<img src="'+fotoEx+'" alt="">' +
+                  '<button class="tira-foto" data-rmfotox="'+ci+'.'+pi+'.'+ex+'" type="button" title="Remover">×</button>'
+                : '+') +
+            '</div>';
+          }
+        }
+
         return '<div class="prod-ed">' +
-          '<div class="prod-foto" data-foto='+alvo+'>' + (foto ? '<img src="'+foto+'" alt="">' : 'Foto do produto') + '</div>' +
+          '<div class="prod-fotos">' +
+            '<div class="prod-foto" data-foto='+alvo+'>' + (foto ? '<img src="'+foto+'" alt="">' : 'Foto do produto') + '</div>' +
+            (extras ? '<div class="prod-extras">' + extras + '</div>' : '') +
+          '</div>' +
           '<div class="prod-campos">' +
             '<div class="linha-topo">' +
               '<input type="text" data-c="'+ci+'" data-p="'+pi+'" data-f="nome" value="'+escapa(p.nome)+'" placeholder="Nome do produto" style="flex:1;min-width:140px">' +
@@ -4184,6 +4245,40 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
         .then(function(){ avisoSync = 'ok'; })
         .catch(function(){ avisoSync = 'erro'; })
         .then(function(){ pintaSync(); volta(); });
+      return;
+    }
+
+    // Remover foto extra antes de qualquer outra coisa: o botão × fica
+    // dentro do quadrado que abre o seletor de arquivo.
+    var rmx = e.target.closest('[data-rmfotox]');
+    if(rmx){
+      e.stopPropagation();
+      var px = rmx.dataset.rmfotox.split('.');
+      var cx = catalogo()[px[0]], prx = cx && cx.produtos[px[1]];
+      if(prx){
+        imgSalva('p:' + prx.id + '#' + px[2], '').then(function(){
+          // Fecha o buraco: se você tirar a foto 2 de três, a 3 vira 2. Sem
+          // isso a galeria do site mostraria um vazio no meio.
+          for(var n = +px[2]; n < MAX_FOTOS; n++){
+            var seguinte = img('p:' + prx.id + '#' + (n + 1));
+            imgSalva('p:' + prx.id + '#' + n, seguinte || '');
+          }
+          imgSalva('p:' + prx.id + '#' + MAX_FOTOS, '');
+          atualizaVitrine();
+          renderCatalogo();
+          agendaSync();
+        });
+      }
+      return;
+    }
+
+    var fx = e.target.closest('[data-fotox]');
+    if(fx){
+      var pf = fx.dataset.fotox.split('.');
+      var cf = catalogo()[pf[0]], prf = cf && cf.produtos[pf[1]];
+      if(!prf) return;
+      alvoImagem = {chave:'p:' + prf.id + '#' + pf[2], dim:1600, qualidade:0.92};
+      $('fileCat').click();
       return;
     }
 
