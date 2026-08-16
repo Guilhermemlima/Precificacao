@@ -354,6 +354,28 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 .nv-status .ok{color:var(--good); font-weight:600}
 .nv-status .er{color:var(--bad); font-weight:600}
 
+/* ---------- divisão do dinheiro ---------- */
+.pote{
+  display:flex; align-items:center; gap:9px; padding:7px 0;
+  border-bottom:1px solid var(--line);
+}
+.pote:last-child{border-bottom:0}
+.pote .cor{width:9px; height:9px; border-radius:50%; flex:none}
+.pote .nome{
+  flex:1; min-width:110px; background:var(--surface-2); border:1px solid var(--line);
+  border-radius:6px; padding:6px 9px; font-size:13px; color:var(--ink);
+}
+.pote .nome:focus{outline:none; border-color:var(--accent)}
+.pote .pct{width:78px; flex:none}
+.pote .valor{
+  min-width:92px; text-align:right; font-family:var(--font-mono); font-size:13px;
+  font-weight:600; color:var(--ink);
+}
+.legend .dot{
+  display:inline-block; width:8px; height:8px; border-radius:50%;
+  margin-right:7px; vertical-align:middle;
+}
+
 /* ---------- avisos ---------- */
 #avisosN, #orcamentosN{
   display:none; margin-left:6px; font-family:var(--font-mono); font-size:11px; font-weight:700;
@@ -1074,26 +1096,35 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   </div>
 
   <section class="card">
-    <header><h2>Reserva e reinvestimento</h2><span class="hint" id="hintReserva"></span></header>
+    <header>
+      <h2>Divisão do dinheiro</h2>
+      <span class="hint" id="hintReserva"></span>
+    </header>
     <div class="body">
-      <div class="row">
-        <div class="f">
-          <label for="pctReserva">Reserva para refazer peça</label>
-          <div class="inp"><input type="text" inputmode="decimal" id="pctReserva" data-dec="0" value="5"><span class="suf">% do lucro</span></div>
-          <span class="sub">Cobre peça quebrada no transporte, troca por defeito e reimpressão em garantia.</span>
-        </div>
-        <div class="f">
-          <label for="pctReinvest">Reinvestimento no negócio</label>
-          <div class="inp"><input type="text" inputmode="decimal" id="pctReinvest" data-dec="0" value="20"><span class="suf">% do lucro</span></div>
-          <span class="sub">Filamento, bicos, chapa, segunda impressora.</span>
-        </div>
-        <div class="f">
-          <label>Sobra para você</label>
-          <div class="inp"><input type="text" id="pctVoce" disabled value="75"><span class="suf">%</span></div>
-          <span class="sub">O que resta do lucro líquido depois das duas reservas.</span>
-        </div>
+      <p class="note">
+        O que entrou no mês, dividido: primeiro sai o material para você
+        recomprar filamento, e o que sobra vai para os potes abaixo. As
+        porcentagens são suas — mexa até somar 100%.
+      </p>
+
+      <div id="rateioMes"></div>
+
+      <div>
+        <div class="mini-label">Seus potes</div>
+        <div id="listaPotes"></div>
+        <button class="btn tiny" id="btnNovoPote" type="button" style="margin-top:8px">+ Novo pote</button>
       </div>
-      <table class="legend" id="tabReserva"></table>
+
+      <div>
+        <div class="mini-label">Quanto já deveria estar guardado</div>
+        <p class="note">
+          Soma de todos os meses desde o início, menos o que você já tirou. É
+          uma meta, não um extrato de banco — quem sabe o saldo de verdade é o
+          seu banco.
+        </p>
+        <table class="legend" id="tabCofres"></table>
+      </div>
+
       <div>
         <div class="mini-label">Quanto a impressora já se pagou</div>
         <div class="meter"><span id="meterFill"></span></div>
@@ -1101,6 +1132,29 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       </div>
     </div>
   </section>
+
+  <dialog id="dlgRetirada">
+    <form method="dialog" class="dlg-x"><button class="btn tiny ghost" type="submit">Fechar</button></form>
+    <h2 class="dlg-t">Registrar retirada</h2>
+    <p class="dlg-s" id="retSub"></p>
+    <div class="dlg-passo">
+      <div class="row">
+        <div class="f">
+          <label for="retValor">Valor</label>
+          <div class="inp"><span class="pre">R$</span><input type="text" inputmode="decimal" id="retValor" placeholder="0,00"></div>
+        </div>
+        <div class="f">
+          <label for="retNota">No que foi usado</label>
+          <div class="inp"><input class="txt" type="text" id="retNota" placeholder="Ex.: entrada da impressora nova"></div>
+        </div>
+      </div>
+      <p class="note">Isso desconta do pote e fica no histórico abaixo.</p>
+    </div>
+    <div class="dlg-acts">
+      <button class="btn primary" id="btnSalvaRetirada" type="button">Registrar</button>
+    </div>
+    <div id="histRetiradas"></div>
+  </dialog>
 
   <section class="card" id="cardPedidos">
     <header>
@@ -1564,7 +1618,9 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     'fixosMes','horasProdMes','margem','comissao','taxaPagamento','imposto',
     'freteModo','freteValor','qtd1','desc1','qtd2','desc2','qtd3','desc3','precoTeste',
     'orcMarca','orcFone','orcContato','orcDoc','orcCliente','orcClienteContato','orcNumero',
-    'orcPrazo','orcValidade','orcPagamento','orcDescricao','orcObs','pctReserva','pctReinvest',
+    // pctReserva e pctReinvest saíram: a divisão do dinheiro virou uma lista
+    // de potes com nome, guardada em p3d.potes.
+    'orcPrazo','orcValidade','orcPagamento','orcDescricao','orcObs',
     'diasFornecedor','diasEnvio','diasAlerta'];
 
   function val(id){ return parseNum($(id).value); }
@@ -3101,6 +3157,39 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     return p.taxas + p.custoProducao + p.custoTrabalho + p.custoEstrutura;
   }
 
+  /* ---------- divisão do dinheiro ----------
+     A conta que ele fazia na cabeça, escrita: entrou X, o material volta para
+     comprar filamento, e o que sobra é repartido em potes com nome — contas,
+     máquina nova, o que for. O saldo de cada pote é uma meta ("já deveria ter
+     guardado tanto"), não um extrato: quem sabe o saldo de verdade é o banco. */
+
+  var POTES_PADRAO = [
+    {id:'contas',  nome:'Minhas contas',     pct:60},
+    {id:'maquina', nome:'Máquina nova',      pct:25},
+    {id:'reserva', nome:'Refazer peça',      pct:15}
+  ];
+
+  function potes(){
+    try{
+      var p = JSON.parse(load('p3d.potes') || 'null');
+      return (p && p.length) ? p : POTES_PADRAO.slice();
+    }catch(e){ return POTES_PADRAO.slice(); }
+  }
+  function setPotes(p){ store('p3d.potes', JSON.stringify(p)); }
+
+  function retiradas(){
+    try{ return JSON.parse(load('p3d.retiradas') || '[]'); }catch(e){ return []; }
+  }
+  function setRetiradas(r){ store('p3d.retiradas', JSON.stringify(r)); }
+
+  /** Quanto saiu de um pote até hoje. */
+  function jaRetirado(idPote){
+    return retiradas().filter(function(r){ return r.pote === idPote; })
+                      .reduce(function(t, r){ return t + parseNum(r.valor); }, 0);
+  }
+
+  var CORES_POTE = ['var(--s1)','var(--s7)','var(--good)','var(--s3)','var(--s5)','var(--warn)'];
+
   function resumo(lista){
     var s = {receita:0, taxas:0, producao:0, trabalho:0, estrutura:0, horas:0, deprec:0, n:lista.length};
     lista.forEach(function(p){
@@ -3297,6 +3386,185 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
   }
 
+  /**
+   * A divisão do mês e o saldo dos potes.
+   *
+   * `s` é o resumo do período escolhido; `todos` são os pedidos desde sempre,
+   * usados para o acumulado.
+   */
+  function renderDivisao(s, todos){
+    var ps = potes();
+    var soma = ps.reduce(function(t, p){ return t + parseNum(p.pct); }, 0);
+    var lucro = Math.max(0, s.lucroLiquido);
+    // O material é o dinheiro que precisa voltar para a bobina. Ele não entra
+    // no rateio: se entrasse, você repartiria dinheiro que já tem dono.
+    var material = Math.max(0, s.producao);
+
+    // ---- o que fazer com o dinheiro do mês
+    $('rateioMes').innerHTML =
+      '<table class="legend"><tbody>' +
+        '<tr><td>Entrou no mês</td><td class="n">' + money(s.receita) + '</td></tr>' +
+        '<tr><td><span style="color:var(--warn)">↺</span> Recomprar material</td>' +
+          '<td class="n">' + money(material) + '</td></tr>' +
+        '<tr><td>Outros custos (taxas, energia, seu trabalho)</td>' +
+          '<td class="n">' + money(Math.max(0, s.custoTotal - material)) + '</td></tr>' +
+        '<tr><td><b>Sobrou para dividir</b></td>' +
+          '<td class="n"><b>' + money(lucro) + '</b></td></tr>' +
+      '</tbody></table>';
+
+    // ---- os potes, com o quanto cada um leva neste mês
+    $('listaPotes').innerHTML = ps.map(function(p, i){
+      var fatia = soma > 0 ? parseNum(p.pct)/soma : 0;
+      return '<div class="pote">' +
+        '<span class="cor" style="background:' + CORES_POTE[i % CORES_POTE.length] + '"></span>' +
+        '<input class="txt nome" type="text" data-pote-nome="' + i + '" value="' + escapa(p.nome) + '" placeholder="Nome do pote">' +
+        '<div class="inp pct"><input type="text" inputmode="decimal" data-pote-pct="' + i + '" value="' + num(parseNum(p.pct), 0) + '"><span class="suf">%</span></div>' +
+        '<span class="valor">' + money(lucro * fatia) + '</span>' +
+        '<button class="btn tiny ghost" data-pote-rm="' + i + '" type="button" title="Excluir pote">×</button>' +
+      '</div>';
+    }).join('');
+
+    // Somar diferente de 100 não trava nada — a fatia é proporcional —, mas
+    // avisa, porque quase sempre é dedo errado e não intenção.
+    $('hintReserva').textContent = soma === 100
+      ? money(lucro) + ' a dividir'
+      : 'seus potes somam ' + num(soma, 0) + '%, não 100%';
+    $('hintReserva').style.color = soma === 100 ? '' : 'var(--warn)';
+
+    // ---- acumulado desde o início, menos o que já saiu
+    var desdeOInicio = resumo(todos.filter(ehReceita));
+    var lucroTotal = Math.max(0, desdeOInicio.lucroLiquido);
+
+    $('tabCofres').innerHTML = '<tbody>' + ps.map(function(p, i){
+      var fatia = soma > 0 ? parseNum(p.pct)/soma : 0;
+      var deveria = lucroTotal * fatia;
+      var tirou = jaRetirado(p.id);
+      var saldo = deveria - tirou;
+      return '<tr>' +
+        '<td><span class="dot" style="background:' + CORES_POTE[i % CORES_POTE.length] + '"></span>' +
+          escapa(p.nome) + '</td>' +
+        '<td class="n" style="color:var(--muted)" title="Total acumulado, antes das retiradas">' +
+          money(deveria) + '</td>' +
+        '<td class="n" style="color:var(--muted)">' + (tirou > 0 ? '− ' + money(tirou) : '—') + '</td>' +
+        '<td class="n"><b style="color:' + (saldo >= 0 ? 'var(--good)' : 'var(--bad)') + '">' +
+          money(saldo) + '</b></td>' +
+        '<td class="n"><button class="btn tiny" data-retirar="' + escapa(p.id) + '" type="button">Retirar</button></td>' +
+      '</tr>';
+    }).join('') + '</tbody>';
+  }
+
+  /* Guarda o que mudou nos potes e redesenha. */
+  function salvaPotes(mexe){
+    var ps = potes();
+    mexe(ps);
+    setPotes(ps);
+    renderGestao();
+  }
+
+  $('listaPotes').addEventListener('input', function(e){
+    var n = e.target.closest('[data-pote-nome]');
+    if(n){ var ps = potes(); ps[+n.dataset.poteNome].nome = n.value; setPotes(ps); return; }
+    var p = e.target.closest('[data-pote-pct]');
+    if(p){
+      var qs = potes(); qs[+p.dataset.potePct].pct = parseNum(p.value); setPotes(qs);
+      // Redesenha só os números, para o campo não perder o foco enquanto digita.
+      var todos = pedidos();
+      renderDivisaoLeve(todos);
+    }
+  });
+
+  /* Atualiza os valores sem recriar os campos — senão o cursor pula. */
+  function renderDivisaoLeve(todos){
+    var sel = $('mesSel').value;
+    var noMes = function(p){ return sel === 'tudo' || mesDe(p.data) === sel; };
+    var s = resumo(todos.filter(function(p){ return ehReceita(p) && noMes(p); }));
+    var ps = potes();
+    var soma = ps.reduce(function(t, p){ return t + parseNum(p.pct); }, 0);
+    var lucro = Math.max(0, s.lucroLiquido);
+
+    [].forEach.call($('listaPotes').querySelectorAll('.valor'), function(el, i){
+      var fatia = soma > 0 ? parseNum(ps[i].pct)/soma : 0;
+      el.textContent = money(lucro * fatia);
+    });
+    $('hintReserva').textContent = soma === 100
+      ? money(lucro) + ' a dividir'
+      : 'seus potes somam ' + num(soma, 0) + '%, não 100%';
+    $('hintReserva').style.color = soma === 100 ? '' : 'var(--warn)';
+  }
+
+  $('listaPotes').addEventListener('click', function(e){
+    var b = e.target.closest('[data-pote-rm]');
+    if(!b) return;
+    var ps = potes();
+    if(ps.length <= 1){ alert('Deixe pelo menos um pote.'); return; }
+    if(!confirm('Excluir o pote "' + ps[+b.dataset.poteRm].nome + '"? As retiradas dele continuam no histórico.')) return;
+    salvaPotes(function(lista){ lista.splice(+b.dataset.poteRm, 1); });
+  });
+
+  $('btnNovoPote').addEventListener('click', function(){
+    salvaPotes(function(lista){
+      lista.push({id:'pote' + Date.now().toString(36), nome:'Novo pote', pct:0});
+    });
+  });
+
+  /* ---------- retiradas ---------- */
+  var poteDaRetirada = null;
+
+  $('tabCofres').addEventListener('click', function(e){
+    var b = e.target.closest('[data-retirar]');
+    if(!b) return;
+    poteDaRetirada = b.dataset.retirar;
+    var p = potes().filter(function(x){ return x.id === poteDaRetirada; })[0];
+    $('retSub').textContent = 'De: ' + (p ? p.nome : poteDaRetirada);
+    $('retValor').value = '';
+    $('retNota').value = '';
+    renderHistoricoRetiradas();
+    $('dlgRetirada').showModal();
+  });
+
+  function renderHistoricoRetiradas(){
+    var lista = retiradas().filter(function(r){ return r.pote === poteDaRetirada; })
+                           .sort(function(a,b){ return (b.data||'').localeCompare(a.data||''); });
+    $('histRetiradas').innerHTML = lista.length
+      ? '<div class="mini-label" style="margin-top:14px">Já retirado deste pote</div>' +
+        '<table class="legend"><tbody>' + lista.map(function(r){
+          return '<tr>' +
+            '<td>' + (r.data||'').split('-').reverse().join('/') +
+              (r.nota ? ' <span class="sub">' + escapa(r.nota) + '</span>' : '') + '</td>' +
+            '<td class="n">' + money(parseNum(r.valor)) + '</td>' +
+            '<td class="n"><button class="btn tiny ghost" data-rmret="' + escapa(r.id) + '" type="button">×</button></td>' +
+          '</tr>';
+        }).join('') + '</tbody></table>'
+      : '';
+  }
+
+  $('histRetiradas').addEventListener('click', function(e){
+    var b = e.target.closest('[data-rmret]');
+    if(!b) return;
+    setRetiradas(retiradas().filter(function(r){ return r.id !== b.dataset.rmret; }));
+    renderHistoricoRetiradas();
+    renderGestao();
+  });
+
+  $('btnSalvaRetirada').addEventListener('click', function(){
+    var v = parseNum($('retValor').value);
+    if(!(v > 0)){ alert('Informe um valor maior que zero.'); $('retValor').focus(); return; }
+
+    var r = retiradas();
+    r.push({
+      id: 'ret' + Date.now().toString(36),
+      pote: poteDaRetirada,
+      data: hojeISO(),
+      valor: v,
+      nota: $('retNota').value.trim()
+    });
+    setRetiradas(r);
+    $('retValor').value = '';
+    $('retNota').value = '';
+    renderHistoricoRetiradas();
+    renderGestao();
+  });
+
   function renderGestao(){
     var todos = pedidos();
     var sel = $('mesSel');
@@ -3366,18 +3634,8 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     desenhaTabela($('tabMes'), itens, s.receita, 'Receita recebida');
     $('hintMes').textContent = atual === 'tudo' ? 'desde o início' : mesNome(atual);
 
-    // ---- reserva e reinvestimento
-    var pR = Math.max(0, val('pctReserva'))/100, pI = Math.max(0, val('pctReinvest'))/100;
-    if(pR + pI > 1){ pI = Math.max(0, 1 - pR); }
-    $('pctVoce').value = num(Math.max(0, (1 - pR - pI))*100, 0);
-    var lucroPos = Math.max(0, s.lucroLiquido);
-    var itensRes = [
-      {nome:'Reserva para refazer peça', cor:'var(--s7)', v:lucroPos*pR},
-      {nome:'Reinvestimento no negócio', cor:'var(--s1)', v:lucroPos*pI},
-      {nome:'Sobra para você',           cor:'var(--good)', v:lucroPos*(1-pR-pI)}
-    ];
-    desenhaTabela($('tabReserva'), itensRes, lucroPos, 'Lucro líquido do período');
-    $('hintReserva').textContent = money(lucroPos*(pR+pI)) + ' guardado';
+    // ---- divisão do dinheiro
+    renderDivisao(s, todos);
 
     // ---- payback da impressora
     var todosPagos = resumo(todos.filter(ehReceita));
