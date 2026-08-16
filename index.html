@@ -2979,6 +2979,17 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     }
   });
 
+  /* Devolve o estoque falando direto com o banco.
+     É o caminho de sempre, mantido para quando o site não está configurado
+     ou está fora do ar. Ele não cancela a cobrança — só o site tem a chave
+     do Asaas, e ela nunca pode sair de lá. */
+  function devolveEstoqueDireto(s, p){
+    api('/rest/v1/rpc/cancelar_pedido', {
+      method:'POST',
+      body: JSON.stringify({p_usuario: s.user_id, p_id: p.pedidoLoja})
+    }, true).catch(function(){});
+  }
+
   // Mudou o status de um pedido que veio da loja: o site precisa saber.
   // Cancelar devolve as peças ao estoque; o resto só acompanha o status.
   function avisaLojaDoStatus(p){
@@ -2986,10 +2997,30 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     if(!p || !p.pedidoLoja || !s || !s.user_id) return;
 
     if(p.status === 'cancelado'){
-      api('/rest/v1/rpc/cancelar_pedido', {
-        method:'POST',
-        body: JSON.stringify({p_usuario: s.user_id, p_id: p.pedidoLoja})
-      }, true).catch(function(){});
+      var c = cfgNuvem();
+
+      // Pelo site, quando der: além de devolver o estoque, ele cancela a
+      // cobrança no Asaas. Sem isso o cliente ainda conseguia pagar um pedido
+      // já desfeito, e você precisava lembrar de cancelar nos dois lugares.
+      if(c.loja && c.cronChave){
+        fetch(c.loja + '/api/pedido/cancelar', {
+          method:'POST',
+          headers:{'Content-Type':'application/json', 'x-cron-secret': c.cronChave},
+          body: JSON.stringify({id: p.pedidoLoja})
+        }).then(function(r){ return r.json(); }).then(function(j){
+          if(j && j.ok && j.tinhaCobranca && !j.cobrancaCancelada){
+            alert('O pedido foi cancelado e o estoque voltou, mas a cobrança ' +
+                  'continua no Asaas (' + (j.avisoDaCobranca || 'motivo não informado') +
+                  '). Cancele por lá.');
+          }
+        }).catch(function(){
+          // Site fora do ar: o caminho antigo ainda devolve o estoque.
+          devolveEstoqueDireto(s, p);
+        });
+        return;
+      }
+
+      devolveEstoqueDireto(s, p);
       return;
     }
 
