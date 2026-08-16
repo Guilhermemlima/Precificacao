@@ -2772,6 +2772,24 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
           bloco('Itens',
             '<table class="tb"><tbody>' + htmlItens + contas + '</tbody></table>') +
 
+          // Colar o código aqui dispara o e-mail "seu pedido foi enviado" e
+          // faz a etapa "a caminho" acender na página de acompanhar do
+          // cliente. Sem isso, ele só descobre que a peça saiu quando ela
+          // bate na porta — e até lá pergunta no WhatsApp.
+          bloco('Envio',
+            '<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center">' +
+              '<input class="txt" id="pedRastreio" type="text" placeholder="Código dos Correios (AA123456789BR)" ' +
+                'value="' + escapa(p.rastreio || '') + '" ' +
+                'style="flex:1; min-width:220px; background:var(--surface-2); border:1px solid var(--line-strong); ' +
+                'border-radius:7px; padding:8px 10px; font-family:var(--font-mono); font-size:13px; color:var(--ink)">' +
+              '<button class="btn tiny primary" id="pedSalvaRastreio" type="button">Salvar e avisar</button>' +
+            '</div>' +
+            (p.aviso_envio_em
+              ? '<p class="note">Cliente avisado por e-mail em ' +
+                new Date(p.aviso_envio_em).toLocaleDateString('pt-BR') + '.</p>'
+              : '<p class="note">Ao salvar, o cliente recebe o código por e-mail no próximo giro dos avisos (até 15 minutos).</p>')
+          ) +
+
           bloco('Pagamento',
             linhaInfo('Forma escolhida', escapa(p.pagamento || '—')) +
             linhaInfo('Pago em', p.pago_em ? (p.pago_em || '').slice(0,10).split('-').reverse().join('/') : '') +
@@ -2783,6 +2801,36 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
                 'style="margin-top:8px">Abrir a cobrança</a>'
               : '<p class="note">Sem cobrança gerada — o acerto foi combinado por fora.</p>')
           );
+
+        var salvar = $('pedSalvaRastreio');
+        if(salvar) salvar.addEventListener('click', function(){
+          var codigo = $('pedRastreio').value.trim().toUpperCase();
+          if(!codigo){ alert('Cole o código de rastreio antes de salvar.'); return; }
+
+          salvar.disabled = true;
+          salvar.textContent = 'Salvando...';
+
+          var mudanca = {rastreio: codigo};
+          // Só marca a data de envio na primeira vez. Corrigir um código
+          // digitado errado não pode reescrever quando a peça saiu.
+          if(!p.enviado_em) mudanca.enviado_em = new Date().toISOString();
+          // Código novo, aviso novo: se você corrigir o código, o cliente
+          // precisa receber o certo.
+          if(codigo !== (p.rastreio || '')) mudanca.aviso_envio_em = null;
+
+          api('/rest/v1/pedidos_loja?id=eq.' + encodeURIComponent(idLoja), {
+            method:'PATCH',
+            headers:{'Prefer':'return=minimal'},
+            body: JSON.stringify(mudanca)
+          }, true).then(function(){
+            salvar.textContent = 'Salvo';
+            setTimeout(function(){ abreDetalhesDoPedido(idLoja); }, 900);
+          }).catch(function(err){
+            salvar.disabled = false;
+            salvar.textContent = 'Salvar e avisar';
+            alert('Não consegui salvar: ' + (err && err.message));
+          });
+        });
 
         var btn = $('pedCopiaEnd');
         if(btn) btn.addEventListener('click', function(){
