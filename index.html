@@ -2294,7 +2294,15 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
      mexer nas faixas, sem produto a produto. */
   function escadaDeQuantidade(base){
     if(!(base > 0)) return [];
-    var pontos = [{qtd:1, preco:arredondaComercial(base, 0)}];
+    // O ponto de uma unidade é o preço publicado, sem arredondar.
+    //
+    // Arredondar aqui parecia inofensivo e criava uma divergência de dinheiro:
+    // com o preço em 89,00 a faixa virava 89,90, e como a loja calcula o
+    // desconto pela primeira faixa e o banco calcula pelo preço base, a tela
+    // mostrava 89,00 e o Asaas cobrava 89,90. Se o preço tem que terminar em
+    // ,90, quem decide isso é você na hora de publicar — não esta função,
+    // por baixo, depois.
+    var pontos = [{qtd:1, preco:base}];
     faixas().slice().reverse().forEach(function(f){
       var q = Math.round(f[0]);
       if(q > 1){
