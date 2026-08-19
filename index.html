@@ -1603,11 +1603,32 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   function num(v,d){ return new Intl.NumberFormat('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}).format(isFinite(v)?v:0); }
   function $(id){ return document.getElementById(id); }
 
+  /**
+   * Lê número escrito do jeito brasileiro.
+   *
+   * O ponto aqui é separador de milhar, não decimal — e isso precisava valer
+   * mesmo sem vírgula na frente. Antes só valia quando havia vírgula, e o
+   * estrago era silencioso: você digitava 6000 na vida útil, o campo
+   * reformatava para "6.000" ao perder o foco, e na leitura seguinte virava
+   * 6. A depreciação é o preço da máquina dividido pela vida útil, então o
+   * custo por hora ficava mil vezes maior e o preço da peça disparava.
+   *
+   * "1.5" continua sendo um e meio: quem digita assim está usando o ponto do
+   * teclado numérico, não separando milhar.
+   */
   function parseNum(s){
     if(typeof s === 'number') return s;
     s = String(s||'').replace(/[R$\s]/g,'');
     if(!s) return 0;
-    if(s.indexOf(',') > -1){ s = s.replace(/\./g,'').replace(',', '.'); }
+
+    if(s.indexOf(',') > -1){
+      // Com vírgula, o papel de cada símbolo é claro.
+      s = s.replace(/\./g,'').replace(',', '.');
+    } else if(/^-?\d{1,3}(\.\d{3})+$/.test(s)){
+      // Sem vírgula, mas com pontos agrupando de três em três: milhar.
+      s = s.replace(/\./g,'');
+    }
+
     var n = parseFloat(s);
     return isFinite(n) ? n : 0;
   }
