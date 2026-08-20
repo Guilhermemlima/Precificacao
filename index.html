@@ -6150,7 +6150,12 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   var DOCS = {
     config:   { ler: function(){ return estado(); },            gravar: function(v){ aplica(v); } },
     catalogo: { ler: function(){ return {lista: catalogo()}; }, gravar: function(v){ setCatalogo(v.lista||[]); } },
-    peca:     { ler: function(){ return {lista: lib()}; },      gravar: function(v){ setLib(v.lista||[]); } }
+    peca:     { ler: function(){ return {lista: lib()}; },      gravar: function(v){ setLib(v.lista||[]); } },
+    // A divisao do dinheiro tambem e configuracao sua. Sem isto ela ficava
+    // presa num navegador so: abrir o app no celular mostrava os potes
+    // padrao e nenhuma retirada, como se voce nunca tivesse configurado.
+    potes:    { ler: function(){ return {lista: potes()}; },     gravar: function(v){ setPotes(v.lista||[]); } },
+    retirada: { ler: function(){ return {lista: retiradas()}; }, gravar: function(v){ setRetiradas(v.lista||[]); } }
   };
   // Enquanto aplicamos o que veio de fora, os salvamentos não podem
   // carimbar nada — senão o dado volta a subir e vira eco sem fim.
@@ -6480,6 +6485,18 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   setLib = function(a){
     if(!aplicandoRemoto) marca('peca', 'doc');
     _setLib(a);
+  };
+
+  var _setPotes = setPotes;
+  setPotes = function(a){
+    if(!aplicandoRemoto) marca('potes', 'doc');
+    _setPotes(a);
+  };
+
+  var _setRetiradas = setRetiradas;
+  setRetiradas = function(a){
+    if(!aplicandoRemoto) marca('retirada', 'doc');
+    _setRetiradas(a);
   };
 
   var _imgSalva = imgSalva;
