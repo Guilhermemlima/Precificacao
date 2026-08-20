@@ -1,26 +1,27 @@
 -- ============================================================
---  Moldarte 3D · conserta a divergência de preço
+--  Moldarte 3D · conserta a divergencia de preco
 --
 --  Rode DEPOIS de supabase-cupons.sql, no SQL Editor.
 --  Pode rodar mais de uma vez sem estragar nada.
 --
 --  O PROBLEMA
---  A loja mostrava um valor e o Asaas cobrava outro. Exemplo real
---  do catálogo: o Pernalonga tem preço 89,00 publicado, mas a
---  primeira faixa de quantidade ficou em 89,90. A loja aplicava o
---  desconto por volume usando a primeira faixa como referência, e o
---  banco usava o preço base — duas contas, dois resultados.
+--  A loja mostrava um valor e o Asaas cobrava outro. O Pernalonga
+--  tem preco 89,00 publicado, mas a primeira faixa de quantidade
+--  ficou em 89,90 — ela era arredondada na publicacao e o preco
+--  base nao. A loja dividia pela primeira faixa, o banco dividia
+--  pelo preco base: duas contas, dois resultados.
 --
---    quantidade 1  → tela R$  89,00   cobrança R$  89,90
---    quantidade 3  → tela R$ 252,15   cobrança R$ 254,70
---    quantidade 10 → tela R$ 741,50   cobrança R$ 749,00
+--  A CORRECAO
+--  Faixa de uma unidade nao muda preco. Uma unidade custa o preco
+--  publicado, e so faixas a partir de duas unidades aplicam
+--  desconto. Vale para o que ja esta publicado, sem republicar.
 --
---  A CORREÇÃO
---  Faixa de uma unidade não muda preço — uma unidade custa o preço
---  publicado, ponto. Só faixas a partir de duas unidades aplicam
---  desconto. Assim o valor deixa de depender de a primeira faixa
---  concordar ou não com o preço base, e vale para o que já está
---  publicado sem precisar republicar nada.
+--  Este arquivo e a funcao do supabase-cupons.sql com essa unica
+--  linha a mais, recortada do original em vez de reescrita. A
+--  versao anterior deste arquivo tinha sido escrita a mao e
+--  trocava o nome de uma coluna do extrato de estoque — gravava
+--  "quantidade" onde a coluna se chama "delta" —, e por isso todo
+--  pedido era recusado pelo banco.
 -- ============================================================
 
 create or replace function public.criar_pedido(
@@ -32,7 +33,7 @@ create or replace function public.criar_pedido(
   p_pagamento          text,
   p_observacoes        text,
   p_horas_reserva      integer default 24,
-  p_cupom              text default null,
+  p_cupom              text    default null,
   p_frete_padrao       numeric default 0,
   p_frete_gratis_acima numeric default 0
 )
@@ -45,106 +46,92 @@ declare
   v_item      jsonb;
   v_linha     record;
   v_conteudo  jsonb;
-  v_slug      text;
   v_qtd       integer;
-  v_tam       text;
-  v_base      numeric(10,2);
+  v_disp      integer;
   v_unit      numeric(10,2);
   v_faixa     jsonb;
-  v_tamanho   jsonb;
-  v_itens     jsonb := '[]'::jsonb;
+  v_base      numeric(10,2);
+  v_adicional numeric(10,2);
   v_subtotal  numeric(10,2) := 0;
+  v_itens     jsonb := '[]'::jsonb;
   v_frete     numeric(10,2) := 0;
   v_desconto  numeric(10,2) := 0;
   v_cupom     jsonb;
-  v_cupom_cod text;
-  v_disp      integer;
+  v_cupom_cod text := null;
 begin
   perform expirar_reservas(p_usuario);
 
-  if jsonb_array_length(coalesce(p_itens, '[]'::jsonb)) = 0 then
+  if jsonb_array_length(p_itens) = 0 then
     return jsonb_build_object('ok', false, 'erro', 'carrinho_vazio');
   end if;
 
   for v_item in select * from jsonb_array_elements(p_itens) loop
-    v_slug := v_item->>'slug';
-    v_qtd  := greatest(1, coalesce((v_item->>'quantidade')::int, 1));
-    v_tam  := v_item->>'tamanho';
+    v_qtd := greatest(1, coalesce((v_item->>'quantidade')::int, 1));
 
-    -- Trava a linha do produto: dois pedidos ao mesmo tempo entram em
-    -- fila, em vez de os dois levarem a última peça.
     select * into v_linha
-      from dados
-     where usuario = p_usuario and colecao = 'loja' and id = v_slug
-       and coalesce(apagado, false) = false
-     for update;
+    from dados
+    where usuario = p_usuario and colecao = 'loja'
+      and id = v_item->>'slug' and not apagado
+    for update;
 
     if not found then
-      return jsonb_build_object('ok', false, 'erro', 'produto_fora_do_ar', 'slug', v_slug);
+      return jsonb_build_object('ok', false, 'erro', 'produto_fora_do_ar',
+                                'slug', v_item->>'slug');
     end if;
 
     v_conteudo := v_linha.conteudo;
 
     if coalesce(v_conteudo->>'modo', '') = 'consulta' then
       return jsonb_build_object('ok', false, 'erro', 'produto_sob_consulta',
-                                'nome', v_conteudo->>'nome');
+                                'slug', v_linha.id);
+    end if;
+
+    select disponivel into v_disp
+    from estoque_disponivel(p_usuario) e where e.slug = v_linha.id;
+
+    if coalesce(v_disp, 0) < v_qtd then
+      return jsonb_build_object('ok', false, 'erro', 'estoque_insuficiente',
+                                'slug', v_linha.id,
+                                'nome', v_conteudo->>'nome',
+                                'disponivel', coalesce(v_disp, 0));
     end if;
 
     v_base := coalesce((v_conteudo->>'preco')::numeric, 0);
-    v_unit := v_base;
+    v_adicional := 0;
 
-    -- Adicional do tamanho escolhido.
-    if v_tam is not null then
-      select t into v_tamanho
-        from jsonb_array_elements(coalesce(v_conteudo->'tamanhos', '[]'::jsonb)) t
-       where t->>'nome' = v_tam
-       limit 1;
-      if v_tamanho is not null then
-        v_unit := coalesce((v_tamanho->>'preco')::numeric, v_unit);
-      end if;
+    if v_item ? 'tamanho' and coalesce(v_item->>'tamanho', '') <> '' then
+      select coalesce((t->>'adicional')::numeric, 0) into v_adicional
+      from jsonb_array_elements(coalesce(v_conteudo->'tamanhos', '[]'::jsonb)) t
+      where t->>'nome' = v_item->>'tamanho' limit 1;
+      v_adicional := coalesce(v_adicional, 0);
     end if;
 
-    -- Desconto por quantidade.
-    --
-    -- Só faixas a partir de DUAS unidades. A faixa de uma unidade é só a
-    -- linha "1 un — preço cheio" da tabela; quando ela discorda do preço
-    -- base — e discorda, porque era arredondada na publicação — usá-la
-    -- fazia a cobrança sair diferente do que a loja mostrou.
+    v_unit := v_base + v_adicional;
+
     select t into v_faixa
-      from jsonb_array_elements(coalesce(v_conteudo->'faixas', '[]'::jsonb)) t
-     where coalesce((t->>'qtd')::int, 1) <= v_qtd
+    from jsonb_array_elements(coalesce(v_conteudo->'faixas', '[]'::jsonb)) t
+    where coalesce((t->>'qtd')::int, 1) <= v_qtd
        and coalesce((t->>'qtd')::int, 1) > 1
-     order by (t->>'qtd')::int desc limit 1;
+    order by (t->>'qtd')::int desc limit 1;
 
     if v_faixa is not null and v_base > 0 then
       v_unit := round(v_unit * (coalesce((v_faixa->>'preco')::numeric, v_base) / v_base), 2);
     end if;
 
-    -- Estoque disponível de agora.
-    select disponivel into v_disp
-      from estoque_disponivel(p_usuario)
-     where slug = v_slug;
-
-    if coalesce(v_disp, 0) < v_qtd then
-      return jsonb_build_object('ok', false, 'erro', 'estoque_insuficiente',
-                                'slug', v_slug, 'nome', v_conteudo->>'nome',
-                                'disponivel', coalesce(v_disp, 0));
-    end if;
-
     v_subtotal := v_subtotal + (v_unit * v_qtd);
 
     v_itens := v_itens || jsonb_build_object(
-      'slug', v_slug, 'nome', v_conteudo->>'nome',
+      'slug', v_linha.id, 'nome', v_conteudo->>'nome',
       'tamanho', v_item->>'tamanho', 'opcoes', v_item->'opcoes',
       'quantidade', v_qtd, 'precoUnitario', v_unit,
       'total', round(v_unit * v_qtd, 2)
     );
 
-    insert into estoque_movimento (usuario, slug, quantidade, motivo, pedido_id)
-    values (p_usuario, v_slug, -v_qtd, 'reserva', p_id);
+    insert into estoque_movimento (usuario, slug, delta, motivo, pedido_id)
+    values (p_usuario, v_linha.id, -v_qtd, 'venda', p_id);
   end loop;
 
-  -- Frete: a loja informa a tabela, a conta é feita aqui.
+  -- Frete pela tabela da loja, nunca pelo que veio da tela.
   v_frete := case
     when p_frete_gratis_acima > 0 and v_subtotal >= p_frete_gratis_acima then 0
     else coalesce(p_frete_padrao, 0)
@@ -168,8 +155,8 @@ begin
       update cupons set usos = usos + 1
       where usuario = p_usuario and upper(codigo) = v_cupom_cod;
     else
-      -- Cupom recusado derruba o pedido de propósito: cobrar sem o desconto
-      -- que a tela prometeu seria pior do que pedir para tentar de novo.
+      -- Cupom inválido não derruba a compra: o pedido segue sem o desconto,
+      -- e a loja avisa por que na resposta.
       return jsonb_build_object('ok', false, 'erro', 'cupom_invalido',
                                 'recado', v_cupom->>'recado');
     end if;
@@ -193,20 +180,6 @@ begin
     'cupom', v_cupom_cod,
     'total', greatest(0, round(v_subtotal - v_desconto + v_frete, 2))
   );
-end;
-$$;
+end $$;
 
-grant execute on function public.criar_pedido(uuid, text, jsonb, jsonb, jsonb, text, text, integer, text, numeric, numeric) to authenticated;
-
--- ------------------------------------------------------------
---  Conferência
--- ------------------------------------------------------------
--- Os preços que a loja publicou, para comparar com a tela:
---   select id,
---          (conteudo->>'preco')::numeric               as preco_base,
---          conteudo->'faixas'->0->>'preco'             as primeira_faixa
---     from public.dados
---    where colecao = 'loja' and coalesce(apagado,false) = false;
---
--- Depois da correção, preco_base é o que vale para uma unidade,
--- concorde ou não com primeira_faixa.
+revoke execute on function public.criar_pedido(uuid, text, jsonb, jsonb, jsonb, text, text, integer, text, numeric, numeric) from anon;
