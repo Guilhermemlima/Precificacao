@@ -6456,6 +6456,18 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     store('p3d.marcaAgua', '1970-01-01T00:00:00Z');
     statusNuvem();
   });
+  /* Os campos da nuvem salvam sozinhos, enquanto voce digita.
+     Antes eles so eram gravados por efeito colateral de "Entrar" ou "Criar
+     conta". Quem ja estava logado nao via esses botoes: digitava o endereco
+     da loja, fechava o dialogo, e nada era guardado. Ao reabrir, o dialogo
+     recarregava o que estava salvo antes — e parecia que o app tinha apagado
+     tudo, quando na verdade nunca chegou a salvar. */
+  ['nvUrl','nvKey','nvLoja','nvLojaChave','nvCron'].forEach(function(id){
+    $(id).addEventListener('input', salvaCfgDaTela);
+  });
+  // Fechar tambem grava: cobre quem colou com o mouse, sem disparar input.
+  $('dlgNuvem').addEventListener('close', salvaCfgDaTela);
+
   $('nvSync').addEventListener('click', function(){ comBotao(this, 'Sincronizando…', sincronizar()); });
   $('nvEnviarTudo').addEventListener('click', function(){ comBotao(this, 'Enviando…', enviarTudo()); });
   window.addEventListener('online', function(){ luzNuvem(); agendaSync(); });
