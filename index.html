@@ -3211,19 +3211,41 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
           headers:{'Content-Type':'application/json', 'x-cron-secret': c.cronChave},
           body: JSON.stringify({id: p.pedidoLoja})
         }).then(function(r){ return r.json(); }).then(function(j){
-          if(j && j.ok && j.tinhaCobranca && !j.cobrancaCancelada){
-            alert('O pedido foi cancelado e o estoque voltou, mas a cobrança ' +
-                  'continua no Asaas (' + (j.avisoDaCobranca || 'motivo não informado') +
-                  '). Cancele por lá.');
+          if(!j || !j.ok){
+            // A loja recusou: o estoque ainda precisa voltar.
+            devolveEstoqueDireto(s, p);
+            alert('Pedido cancelado e estoque devolvido, mas a loja recusou a ' +
+                  'chamada (' + ((j && j.recado) || 'motivo nao informado') + '). ' +
+                  'A cobranca continua no Asaas - cancele por la.');
+            return;
+          }
+
+          if(j.tinhaCobranca && !j.cobrancaCancelada){
+            alert('Pedido cancelado e estoque devolvido, mas a cobranca continua ' +
+                  'no Asaas (' + (j.avisoDaCobranca || 'motivo nao informado') + '). ' +
+                  'Cancele por la.');
+          } else if(j.tinhaCobranca){
+            alert('Pedido cancelado. O estoque voltou e a cobranca foi cancelada no Asaas.');
+          } else {
+            alert('Pedido cancelado e o estoque voltou. Este pedido nao tinha cobranca gerada.');
           }
         }).catch(function(){
-          // Site fora do ar: o caminho antigo ainda devolve o estoque.
+          // Nao conseguimos falar com a loja. O estoque volta pelo caminho
+          // direto, mas a cobranca fica - e voce precisa saber, senao o
+          // cliente consegue pagar um pedido que ja nao existe.
           devolveEstoqueDireto(s, p);
+          alert('Pedido cancelado e estoque devolvido, mas nao consegui falar ' +
+                'com a loja. A cobranca continua no Asaas - cancele por la.');
         });
         return;
       }
 
+      // Sem a loja configurada o estoque volta, mas a cobranca nao tem como
+      // ser cancelada daqui: so o site tem a chave do Asaas.
       devolveEstoqueDireto(s, p);
+      alert('Pedido cancelado e o estoque voltou. Se ele tinha cobranca no ' +
+            'Asaas, cancele por la. Preencha "Endereco da loja" e "Chave dos ' +
+            'e-mails" no botao Nuvem para isso passar a ser automatico.');
       return;
     }
 
