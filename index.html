@@ -3071,6 +3071,34 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
            '★★★★★'.slice(0, 5 - n) + '</span>';
   }
 
+  /* Cupom de agradecimento por avaliacao com foto.
+     Sai na aprovacao, e nao no envio, porque e aqui que voce olhou a foto e
+     decidiu que ela e da peca mesmo. O site cria o cupom e manda o codigo
+     por e-mail; aqui so mostramos o resultado. */
+  function premiaFoto(idAv){
+    var a = avaliacoes.filter(function(x){ return x.id === idAv; })[0];
+    if(!a || !Array.isArray(a.fotos) || !a.fotos.length) return;
+    if(a.cupom) return;
+
+    var c = cfgNuvem();
+    if(!c.loja || !c.cronChave) return;
+
+    fetch(c.loja + '/api/avaliacao/premiar', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', 'x-cron-secret': c.cronChave},
+      body: JSON.stringify({id: idAv})
+    }).then(function(r){ return r.json(); }).then(function(j){
+      if(!j || !j.ok) return;
+      a.cupom = j.codigo;
+      renderAvaliacoes();
+      alert(j.avisado
+        ? 'Avaliacao publicada. O cupom ' + j.codigo + ' foi enviado por e-mail ao cliente.'
+        : 'Avaliacao publicada e cupom ' + j.codigo + ' criado, mas o e-mail nao saiu. Passe o codigo por WhatsApp.');
+    }).catch(function(){
+      // Site fora do ar: a avaliacao ja foi publicada, e o cupom pode ser
+      // criado depois na aba Cupons.
+    });
+  }
   function renderAvaliacoes(){
     pintaBadgeOrcamentos();
 
@@ -3089,6 +3117,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
           '<span class="quem">' + escapa(a.nome) + '</span>' +
           '<span style="color:var(--accent); letter-spacing:1px">' + estrelas(a.nota) + '</span>' +
           '<span class="pill">' + (a.aprovada ? 'No site' : 'Esperando você') + '</span>' +
+          (a.cupom ? '<span class="pill" title="Cupom de agradecimento enviado ao cliente">' + escapa(a.cupom) + '</span>' : '') +
           '<span class="quando">' + escapa(a.slug) + ' · ' + quando + '</span>' +
         '</div>' +
 
@@ -3119,7 +3148,12 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 
   $('listaAvaliacoes').addEventListener('click', function(e){
     var b = e.target.closest('[data-av-libera]');
-    if(b) return mudaAvaliacao(+b.dataset.avLibera, {aprovada:true});
+    if(b){
+      var idAv = +b.dataset.avLibera;
+      mudaAvaliacao(idAv, {aprovada:true});
+      premiaFoto(idAv);
+      return;
+    }
     b = e.target.closest('[data-av-esconde]');
     if(b) return mudaAvaliacao(+b.dataset.avEsconde, {aprovada:false});
     b = e.target.closest('[data-av-apaga]');
