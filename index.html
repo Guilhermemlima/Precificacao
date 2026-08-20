@@ -3085,10 +3085,17 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 
     // Daqui para baixo o silencio seria ruim: a avaliacao tem foto, entao
     // voce espera um cupom. Se ele nao sair, voce precisa saber por que.
+    // Dizer qual dos dois falta, e nao "um ou outro": a diferenca entre os
+    // dois campos e a diferenca entre achar o problema em cinco segundos ou
+    // ficar conferindo os dois.
     var c = cfgNuvem();
-    if(!c.loja || !c.cronChave){
-      alert('Avaliacao publicada, mas o cupom nao foi gerado: falta o ' +
-            'endereco da loja ou a "Chave dos e-mails" no botao Nuvem.');
+    var falta = [];
+    if(!c.loja)      falta.push('"Endereco da loja"');
+    if(!c.cronChave) falta.push('"Chave dos e-mails"');
+
+    if(falta.length){
+      alert('Avaliacao publicada, mas o cupom nao foi gerado. Falta ' +
+            'preencher ' + falta.join(' e ') + ' no botao Nuvem.');
       return;
     }
 
