@@ -2517,8 +2517,18 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     return 'https://wa.me/' + n + '?text=' + encodeURIComponent(texto);
   }
 
+  /* O primeiro nome do cliente, apresentavel.
+     Ele digita como quer no checkout — "guilherme", "GUILHERME" — e isso ia
+     direto para o "Oi, ..." da mensagem. */
+  function primeiroNome(nome){
+    var bruto = String(nome || '').trim().split(/s+/)[0] || '';
+    if(!bruto) return 'tudo bem';
+    return bruto.charAt(0).toLocaleUpperCase('pt-BR') +
+           bruto.slice(1).toLocaleLowerCase('pt-BR');
+  }
+
   function mensagemDeCobranca(p){
-    var nome = String(p.cliente || '').trim().split(' ')[0] || 'tudo bem';
+    var nome = primeiroNome(p.cliente);
     var txt = 'Oi, ' + nome + '! Aqui é da Moldarte 3D.\n\n' +
       'Seu pedido ' + (p.pedidoLoja || p.id) + ' (' + p.peca + ') está reservado ' +
       'e é só o pagamento para a gente começar a produzir.\n\n' +
@@ -2671,7 +2681,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   }
 
   function mensagemDeOrcamento(o){
-    var nome = String(o.nome || '').trim().split(' ')[0] || 'tudo bem';
+    var nome = primeiroNome(o.nome);
     return 'Oi, ' + nome + '! Aqui é da Moldarte 3D.\n\n' +
       'Recebi seu pedido de orçamento ' + o.id +
       ' e já olhei o que você mandou.\n\n' +
