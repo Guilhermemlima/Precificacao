@@ -412,6 +412,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   padding:5px 10px; color:var(--accent); text-decoration:none;
 }
 .orc .arqs a:hover{border-color:var(--accent)}
+.foto-aval{width:74px; height:74px; object-fit:cover; border-radius:6px; display:block}
 .orc .acts{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px}
 .aviso{
   display:flex; gap:12px; align-items:flex-start; background:var(--surface); border:1px solid var(--line);
@@ -3093,6 +3094,18 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 
         (a.comentario ? '<div class="desc">' + escapa(a.comentario) + '</div>'
                       : '<div class="hint">Só a nota, sem comentário.</div>') +
+
+        // As fotos aparecem aqui porque voce precisa ver o que vai publicar.
+        // Aprovar no escuro seria pior do que nao ter foto nenhuma: basta
+        // uma imagem errada no ar para virar problema seu.
+        ((Array.isArray(a.fotos) && a.fotos.length)
+          ? '<div class="arqs">' + a.fotos.map(function(f){
+              return '<a href="' + escapa(f.url) + '" target="_blank" rel="noopener" ' +
+                     'title="Abrir em tamanho cheio">' +
+                     '<img src="' + escapa(f.url) + '" alt="" class="foto-aval">' +
+                     '</a>';
+            }).join('') + '</div>'
+          : '') +
 
         '<div class="acts">' +
           (a.aprovada
