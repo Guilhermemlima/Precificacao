@@ -5997,7 +5997,8 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   }
 
   /* --- chamadas HTTP --- */
-  function api(caminho, opcoes, comToken){
+  /* Faz a chamada. Quem cuida de token vencido e o api() logo abaixo. */
+  function chamaApi(caminho, opcoes, comToken){
     var c = cfgNuvem();
     var o = opcoes || {};
     o.headers = Object.assign({'apikey': c.key, 'Content-Type': 'application/json'}, o.headers || {});
@@ -6016,6 +6017,34 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
         return corpo;
       });
     });
+  }
+
+  /* Toda chamada autenticada passa por aqui.
+     O token do Supabase dura cerca de uma hora, e so a sincronizacao
+     renovava antes de usar. Entao salvar um codigo de rastreio, aprovar
+     uma avaliacao ou responder um orcamento depois desse tempo morria com
+     "JWT expired", e o trabalho se perdia.
+
+     Renova antes de mandar e, se ainda assim voltar 401, forca a renovacao
+     e tenta de novo uma vez — cobre o caso de o token vencer entre a
+     conferencia e a chegada da requisicao no servidor. */
+  function api(caminho, opcoes, comToken){
+    if(!comToken) return chamaApi(caminho, opcoes, false);
+
+    return renovaToken()
+      .then(function(){ return chamaApi(caminho, opcoes, true); })
+      .catch(function(err){
+        if(err && err.status !== 401) throw err;
+
+        var s = sessao();
+        if(!s || !s.refresh_token) throw err;
+
+        // Zera a validade para renovaToken nao achar que ainda esta boa.
+        setSessao(Object.assign({}, s, {expira_em: 0}));
+        return renovaToken().then(function(){
+          return chamaApi(caminho, opcoes, true);
+        });
+      });
   }
 
   function guardaSessao(d){
