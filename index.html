@@ -2582,6 +2582,44 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     };
   }
 
+  /* Traz de volta o status dos pedidos que ja foram importados.
+     A importacao so olha 'importado = false', entao depois da primeira vez o
+     pedido nunca mais era consultado — e o "pago" que o webhook do Asaas
+     gravou no site ficava invisivel aqui, com a linha presa em "aguardando
+     pagamento" para sempre.
+
+     Muda so o que avanca, e so a partir de "aguardando": pagamento
+     confirmado, reserva vencida, cancelamento feito pelo site. Nunca volta
+     atras e nunca mexe no que voce ja marcou a mao — se voce escreveu
+     "entregue", quem manda continua sendo voce. */
+  function trazStatusDaLoja(){
+    var s = sessao();
+    if(!s || !s.user_id) return Promise.resolve(false);
+
+    return api('/rest/v1/pedidos_loja?select=id,status&importado=is.true' +
+               '&status=in.(pago,expirado,cancelado)', {method:'GET'}, true)
+      .then(function(linhas){
+        var a = pedidos(), mudou = false;
+
+        (linhas || []).forEach(function(pl){
+          var p = a.filter(function(x){ return x.id === 'loja-' + pl.id; })[0];
+          if(!p || p.status !== 'aguardando') return;
+
+          p.status = statusLocalDe(pl.status);
+          p.custoPendente = p.custoPendente !== false;
+          marca('pedido', p.id);
+          mudou = true;
+        });
+
+        if(mudou) setPedidos(a);
+        return mudou;
+      })
+      .catch(function(e){
+        if(window.console) console.warn('Status da loja nao veio: ' + (e && e.message));
+        return false;
+      });
+  }
+
   function importaPedidosDaLoja(){
     var s = sessao();
     if(!s || !s.user_id) return Promise.resolve(false);
@@ -2590,7 +2628,9 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
                {method:'GET'}, true)
       .then(function(linhas){
         linhas = linhas || [];
-        if(!linhas.length) return false;
+        // Sem pedido novo, ainda vale conferir se algum ja importado
+        // mudou de status la no site.
+        if(!linhas.length) return trazStatusDaLoja();
 
         var a = pedidos(), mudou = false;
         linhas.forEach(function(pl){
@@ -2612,6 +2652,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
         return api('/rest/v1/pedidos_loja?id=in.(' + encodeURIComponent(ids) + ')',
                    {method:'PATCH', headers:{'Prefer':'return=minimal'},
                     body: JSON.stringify({importado:true})}, true)
+          .then(trazStatusDaLoja)
           .then(function(){ return true; });
       })
       .catch(function(e){
