@@ -3889,7 +3889,29 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 
     var b = e.target.closest('button[data-rm]');
     if(!b) return;
-    setPedidos(pedidos().filter(function(p){ return p.id !== b.dataset.rm; }));
+
+    var alvo = pedidos().filter(function(x){ return x.id === b.dataset.rm; })[0];
+    if(!alvo) return;
+
+    // Excluir so tirava a linha daqui. Do lado da loja o pedido continuava
+    // vivo: estoque preso, cobranca ativa e o cliente ainda vendo o pedido
+    // na pagina de acompanhar. Na pratica a loja seguia contando como venda,
+    // e a peca nunca voltava para a prateleira.
+    var daLoja = alvo.pedidoLoja && alvo.status !== 'cancelado';
+
+    var pergunta = daLoja
+      ? 'Excluir o pedido ' + alvo.pedidoLoja + ' (' + alvo.cliente + ')? ' +
+        'Ele veio da loja, entao antes de sair daqui vou cancela-lo la: as ' +
+        'pecas voltam para o estoque e a cobranca e cancelada no Asaas.'
+      : 'Excluir o pedido de ' + alvo.cliente + '? Nao da para desfazer.';
+
+    if(!confirm(pergunta)) return;
+
+    // Cancela na loja antes de apagar. Depois de sumir daqui nao haveria
+    // mais como fazer isso — o numero do pedido iria junto.
+    if(daLoja) avisaLojaDoStatus(Object.assign({}, alvo, {status:'cancelado'}));
+
+    setPedidos(pedidos().filter(function(x){ return x.id !== b.dataset.rm; }));
   });
   $('mesSel').addEventListener('change', renderGestao);
   $('filtroStatus').addEventListener('change', renderGestao);
