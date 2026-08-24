@@ -354,6 +354,16 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 .nv-status .ok{color:var(--good); font-weight:600}
 .nv-status .er{color:var(--bad); font-weight:600}
 
+.motivo-opcoes{display:flex; flex-wrap:wrap; gap:7px}
+.motivo-opcoes button{
+  background:var(--surface-2); border:1px solid var(--line); border-radius:999px;
+  padding:6px 13px; font-size:12.5px; color:var(--ink-2); cursor:pointer;
+}
+.motivo-opcoes button:hover{border-color:var(--accent); color:var(--ink)}
+.motivo-opcoes button.on{
+  background:var(--accent); border-color:var(--accent); color:var(--on-accent); font-weight:600;
+}
+
 /* ---------- divisão do dinheiro ---------- */
 .pote{
   display:flex; align-items:center; gap:9px; padding:7px 0;
@@ -1157,6 +1167,20 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     <div id="histRetiradas"></div>
   </dialog>
 
+  <!-- Cancelamento sem motivo anotado vira so um numero que cai. Aqui o que
+       voce ouviu do cliente volta somado, para saber se o problema e preco,
+       prazo ou a peca. Some sozinho da tela enquanto nao houver nada. -->
+  <section class="card" id="cardMotivos" hidden>
+    <header>
+      <h2>Por que perdemos vendas</h2>
+      <span class="hint" id="hintMotivos"></span>
+    </header>
+    <div class="body">
+      <table class="legend" id="tabMotivos"></table>
+      <div id="falasMotivos"></div>
+    </div>
+  </section>
+
   <section class="card" id="cardPedidos">
     <header>
       <h2>Pedidos</h2>
@@ -1305,6 +1329,25 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 </div>
 
 </div>
+
+<dialog id="dlgMotivo">
+  <form method="dialog" class="dlg-x"><button class="btn tiny ghost" type="submit">Fechar</button></form>
+  <h2 class="dlg-t">Por que não fechou?</h2>
+  <p class="dlg-s" id="motivoSub"></p>
+  <div class="dlg-passo">
+    <div class="mini-label">Motivo <span class="sub">(opcional)</span></div>
+    <div id="motivoOpcoes" class="motivo-opcoes"></div>
+    <div class="f" style="margin-top:12px">
+      <label for="motivoTexto">O que o cliente falou</label>
+      <div class="inp"><input class="txt" type="text" id="motivoTexto" placeholder="Ex.: achou o prazo longo, queria outra cor..."></div>
+      <span class="sub">Isso não vai para lugar nenhum além do seu painel. Serve para você ver o padrão depois.</span>
+    </div>
+  </div>
+  <div class="dlg-acts">
+    <button class="btn ghost" id="motivoPular" type="button">Pular</button>
+    <button class="btn primary" id="motivoSalvar" type="button">Salvar e continuar</button>
+  </div>
+</dialog>
 
 <dialog id="dlgPedido">
   <form method="dialog" class="dlg-x"><button class="btn tiny ghost" type="submit">Fechar</button></form>
@@ -3326,6 +3369,87 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     return p.taxas + p.custoProducao + p.custoTrabalho + p.custoEstrutura;
   }
 
+  /* ---------- por que a venda nao fechou ----------
+     O motivo fica num registro proprio, e nao dentro do pedido, porque a
+     licao precisa sobreviver a exclusao: pedido apagado leva junto o que ele
+     tinha, e ai voce preenche o campo e nunca mais ve. Aqui ele continua
+     contando no painel mesmo depois de o pedido sumir da lista.
+
+     Tudo opcional. Obrigar a justificar um cancelamento so faria voce clicar
+     em qualquer coisa para se livrar da tela — e dado preenchido no chute e
+     pior que dado nenhum, porque parece verdade. */
+
+  var MOTIVOS = [
+    'Achou caro',
+    'Prazo longo demais',
+    'Desistiu / sumiu',
+    'Erro no pedido',
+    'Não gostou da peça',
+    'Achou em outro lugar',
+    'Outro'
+  ];
+
+  function motivos(){
+    try{ return JSON.parse(load('p3d.motivos') || '[]'); }catch(e){ return []; }
+  }
+  function setMotivos(m){ store('p3d.motivos', JSON.stringify(m)); }
+
+  var motivoPendente = null;   // o pedido que acabou de cair
+
+  /* Pergunta depois de o cancelamento ja estar feito, nunca antes. O motivo
+     e opcional: se ele fosse a porta por onde a exclusao passa, bastaria a
+     janela falhar — ou a pessoa fechar no X — para o pedido continuar de pe
+     achando que foi excluido. Aqui o pior caso e perder a anotacao, e o
+     registro guarda copia de cliente, peca e valor justamente por isso: o
+     pedido ja pode nem existir mais quando a resposta chegar. */
+  function perguntaMotivo(pedido){
+    motivoPendente = { pedido: pedido, escolhido: '' };
+
+    $('motivoSub').textContent = pedido.peca + ' · ' + pedido.cliente + ' · ' + money(pedido.receita);
+    $('motivoTexto').value = '';
+    $('motivoOpcoes').innerHTML = MOTIVOS.map(function(m){
+      return '<button type="button" data-motivo="' + escapa(m) + '">' + escapa(m) + '</button>';
+    }).join('');
+
+    $('dlgMotivo').showModal();
+  }
+
+  $('motivoOpcoes').addEventListener('click', function(e){
+    var b = e.target.closest('[data-motivo]');
+    if(!b || !motivoPendente) return;
+    var jaEstava = b.classList.contains('on');
+    [].forEach.call(this.children, function(x){ x.classList.remove('on'); });
+    if(!jaEstava){ b.classList.add('on'); motivoPendente.escolhido = b.dataset.motivo; }
+    else motivoPendente.escolhido = '';
+  });
+
+  function fechaMotivo(guardar){
+    var pend = motivoPendente;
+    motivoPendente = null;
+    $('dlgMotivo').close();
+    if(!pend) return;
+
+    var texto = $('motivoTexto').value.trim();
+    if(!guardar || !(pend.escolhido || texto)) return;
+
+    var lista = motivos();
+    lista.push({
+      id: 'mot' + Date.now().toString(36),
+      data: hojeISO(),
+      pedido: pend.pedido.pedidoLoja || pend.pedido.id,
+      cliente: pend.pedido.cliente,
+      peca: pend.pedido.peca,
+      valor: parseNum(pend.pedido.receita),
+      motivo: pend.escolhido || 'Outro',
+      detalhe: texto
+    });
+    setMotivos(lista);
+    renderGestao();
+  }
+
+  $('motivoSalvar').addEventListener('click', function(){ fechaMotivo(true); });
+  $('motivoPular').addEventListener('click', function(){ fechaMotivo(false); });
+
   /* ---------- divisão do dinheiro ----------
      A conta que ele fazia na cabeça, escrita: entrou X, o material volta para
      comprar filamento, e o que sobra é repartido em potes com nome — contas,
@@ -3734,6 +3858,61 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     renderGestao();
   });
 
+  /* O resumo do que fez o cliente desistir. Sem ele o motivo seria so um
+     campo preenchido e esquecido: o valor esta em ver "achou caro" cinco
+     vezes seguidas e R$ 900 perdidos ali. */
+  function renderMotivos(mes){
+    var lista = motivos().filter(function(m){
+      return mes === 'tudo' || mesDe(m.data) === mes;
+    }).sort(function(a,b){ return (b.data||'').localeCompare(a.data||''); });
+
+    $('cardMotivos').hidden = !lista.length;
+    if(!lista.length) return;
+
+    // Soma por motivo, do que mais custou para o que menos custou.
+    var por = {};
+    lista.forEach(function(m){
+      var k = m.motivo || 'Outro';
+      if(!por[k]) por[k] = { n:0, v:0 };
+      por[k].n++;
+      por[k].v += parseNum(m.valor);
+    });
+    var linhas = Object.keys(por).map(function(k){
+      return { k:k, n:por[k].n, v:por[k].v };
+    }).sort(function(a,b){ return b.v - a.v || b.n - a.n; });
+
+    var total = linhas.reduce(function(s,x){ return s + x.v; }, 0);
+    $('hintMotivos').textContent = lista.length + (lista.length === 1 ? ' venda perdida · ' : ' vendas perdidas · ') + money(total);
+
+    $('tabMotivos').innerHTML = '<tbody>' + linhas.map(function(x){
+      return '<tr><td>' + escapa(x.k) + '</td>' +
+             '<td class="n">' + x.n + '×</td>' +
+             '<td class="n">' + money(x.v) + '</td></tr>';
+    }).join('') + '</tbody>';
+
+    // As frases inteiras valem mais que a contagem: e ali que aparece o que
+    // dava para consertar: prazo, cor, acabamento, atendimento.
+    var falas = lista.filter(function(m){ return m.detalhe; }).slice(0, 8);
+    $('falasMotivos').innerHTML = falas.length
+      ? '<div class="mini-label" style="margin-top:14px">O que foi dito</div>' +
+        falas.map(function(m){
+          return '<p class="note" style="margin:6px 0">' +
+            '<strong>' + escapa(m.motivo) + '</strong> · ' + escapa(m.peca) +
+            ' · ' + (m.data||'').split('-').reverse().join('/') +
+            '<br>“' + escapa(m.detalhe) + '”' +
+            ' <button class="btn tiny ghost" data-rmmot="' + escapa(m.id) + '" type="button" ' +
+            'title="Apagar esta anotação">×</button></p>';
+        }).join('')
+      : '';
+  }
+
+  $('falasMotivos').addEventListener('click', function(e){
+    var b = e.target.closest('[data-rmmot]');
+    if(!b) return;
+    setMotivos(motivos().filter(function(m){ return m.id !== b.dataset.rmmot; }));
+    renderGestao();
+  });
+
   function renderGestao(){
     var todos = pedidos();
     var sel = $('mesSel');
@@ -3806,6 +3985,9 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     // ---- divisão do dinheiro
     renderDivisao(s, todos);
 
+    // ---- por que as vendas caem
+    renderMotivos(atual);
+
     // ---- payback da impressora
     var todosPagos = resumo(todos.filter(ehReceita));
     var invest = val('precoMaquina');
@@ -3871,17 +4053,23 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   $('tabPedidos').addEventListener('change', function(e){
     var el = e.target, id = el.dataset.id;
     if(!id) return;
+    var pedidoQueCaiu = null;
     var a = pedidos(), p = a.find(function(x){ return x.id === id; });
     if(!p) return;
     if(el.classList.contains('st')){
+      var virouCancelado = el.value === 'cancelado' && p.status !== 'cancelado';
       p.status = el.value;
       // Pedido que veio do site: cancelar aqui devolve as peças ao estoque lá.
       avisaLojaDoStatus(p);
+      // Venda perdida vale uma pergunta — opcional, e depois de o
+      // cancelamento ja estar feito, para nunca segurar o trabalho.
+      if(virouCancelado) pedidoQueCaiu = p;
     }
     else if(el.classList.contains('en')) p.entrega = el.value || '';
     else if(el.classList.contains('dt')) p.data = el.value || hojeISO();
     setPedidos(a);
     marca('pedido', p.id);
+    if(pedidoQueCaiu) perguntaMotivo(pedidoQueCaiu);
   });
   $('tabPedidos').addEventListener('click', function(e){
     var det = e.target.closest('button[data-det]');
@@ -3912,6 +4100,10 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     if(daLoja) avisaLojaDoStatus(Object.assign({}, alvo, {status:'cancelado'}));
 
     setPedidos(pedidos().filter(function(x){ return x.id !== b.dataset.rm; }));
+
+    // Depois de apagar, e nao antes: a pergunta e opcional e nao pode virar
+    // um degrau no meio da exclusao. O registro guarda copia dos dados.
+    if(alvo.status !== 'cancelado') perguntaMotivo(alvo);
   });
   $('mesSel').addEventListener('change', renderGestao);
   $('filtroStatus').addEventListener('change', renderGestao);
@@ -6199,7 +6391,8 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     // presa num navegador so: abrir o app no celular mostrava os potes
     // padrao e nenhuma retirada, como se voce nunca tivesse configurado.
     potes:    { ler: function(){ return {lista: potes()}; },     gravar: function(v){ setPotes(v.lista||[]); } },
-    retirada: { ler: function(){ return {lista: retiradas()}; }, gravar: function(v){ setRetiradas(v.lista||[]); } }
+    retirada: { ler: function(){ return {lista: retiradas()}; }, gravar: function(v){ setRetiradas(v.lista||[]); } },
+    motivo:   { ler: function(){ return {lista: motivos()}; },   gravar: function(v){ setMotivos(v.lista||[]); } }
   };
   // Enquanto aplicamos o que veio de fora, os salvamentos não podem
   // carimbar nada — senão o dado volta a subir e vira eco sem fim.
@@ -6553,6 +6746,12 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   setRetiradas = function(a){
     if(!aplicandoRemoto) marca('retirada', 'doc');
     _setRetiradas(a);
+  };
+
+  var _setMotivos = setMotivos;
+  setMotivos = function(a){
+    if(!aplicandoRemoto) marca('motivo', 'doc');
+    _setMotivos(a);
   };
 
   var _imgSalva = imgSalva;
