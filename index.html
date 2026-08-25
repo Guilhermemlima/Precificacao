@@ -642,6 +642,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     <button class="tab" id="tabAvisos" type="button">Avisos<span id="avisosN"></span></button>
     <button class="tab" id="tabGestao" type="button">Pedidos e painel</button>
     <button class="tab" id="tabOrcamentos" type="button">Orçamentos<span id="orcamentosN"></span></button>
+    <button class="tab" id="tabClientes" type="button">Clientes<span id="clientesN"></span></button>
     <button class="tab" id="tabCatalogo" type="button">Catálogo</button>
     <button class="tab" id="tabEstoque" type="button">Estoque e cores</button>
     <span class="tab-badge" id="tabBadge"></span>
@@ -1267,6 +1268,39 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   </section>
 </div>
 
+<!-- ============ CLIENTES ============ -->
+<div id="viewClientes" hidden>
+
+  <div class="tiles" id="tilesClientes"></div>
+
+  <section class="card">
+    <header>
+      <h2>Quem compra na loja</h2>
+      <span class="hint" id="clientesHint"></span>
+    </header>
+    <div class="body">
+      <div class="mes-bar" style="margin-bottom:14px">
+        <div class="inp" style="max-width:280px">
+          <input class="txt" type="search" id="buscaCliente" placeholder="Procurar por nome ou e-mail">
+        </div>
+        <select id="ordemClientes" style="width:auto">
+          <option value="gasto">Quem mais gastou</option>
+          <option value="pedidos">Quem mais comprou</option>
+          <option value="recente">Compra mais recente</option>
+          <option value="nome">Nome</option>
+        </select>
+        <button class="btn" type="button" id="btnAtualizaClientes">Atualizar</button>
+      </div>
+      <p class="note" style="margin-bottom:14px">
+        A lista junta duas coisas que estavam separadas: quem comprou e quem só
+        deixou o e-mail para receber novidades. Pedido ainda não pago aparece
+        como <b>em aberto</b> e não entra no gasto — ele ainda pode virar nada.
+      </p>
+      <div id="listaClientes"></div>
+    </div>
+  </section>
+</div>
+
 <!-- ============ ESTOQUE E CORES ============ -->
 <div id="viewEstoque" hidden>
 
@@ -1329,6 +1363,58 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 </div>
 
 </div>
+
+<dialog id="dlgCupomPessoal">
+  <form method="dialog" class="dlg-x"><button class="btn tiny ghost" type="submit">Fechar</button></form>
+  <h2 class="dlg-t">Cupom para uma pessoa</h2>
+  <p class="dlg-s" id="cupPesSub"></p>
+  <div class="dlg-passo">
+    <div class="row">
+      <div class="f">
+        <label for="cupPesTipo">O que o cupom faz</label>
+        <div class="inp"><select id="cupPesTipo">
+          <option value="percentual">Desconto em %</option>
+          <option value="valor">Desconto em R$</option>
+          <option value="frete">Frete grátis</option>
+        </select></div>
+      </div>
+      <div class="f" id="cupPesCampoValor">
+        <label for="cupPesValor">Quanto</label>
+        <div class="inp"><input type="text" inputmode="decimal" id="cupPesValor" placeholder="10"><span class="suf" id="cupPesSufixo">%</span></div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="f">
+        <label for="cupPesMinimo">Compra mínima</label>
+        <div class="inp"><span class="pre">R$</span><input type="text" inputmode="decimal" id="cupPesMinimo" placeholder="0,00"></div>
+      </div>
+      <div class="f">
+        <label for="cupPesDias">Vale por</label>
+        <div class="inp"><input type="text" inputmode="numeric" id="cupPesDias" value="60"><span class="suf">dias</span></div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="f">
+        <label for="cupPesCodigo">Código</label>
+        <div class="inp"><input class="txt" type="text" id="cupPesCodigo" placeholder="VOLTA10"></div>
+      </div>
+      <div class="f">
+        <label for="cupPesMotivo">Motivo <span class="sub">(vai no e-mail)</span></label>
+        <div class="inp"><input class="txt" type="text" id="cupPesMotivo" placeholder="Ex.: obrigado pela décima compra!"></div>
+      </div>
+    </div>
+    <p class="note">
+      O cupom fica preso a este e-mail: o banco confere na hora de fechar o
+      pedido, então repassar o código para outra pessoa não funciona. E ele é
+      de uso único — depois de usado, some sozinho.
+    </p>
+  </div>
+  <div class="dlg-acts">
+    <span class="sub" id="cupPesAviso" style="margin-right:auto"></span>
+    <button class="btn" id="cupPesCriar" type="button">Criar e copiar recado</button>
+    <button class="btn primary" id="cupPesCriarEnviar" type="button">Criar e enviar por e-mail</button>
+  </div>
+</dialog>
 
 <dialog id="dlgMotivo">
   <form method="dialog" class="dlg-x"><button class="btn tiny ghost" type="submit">Fechar</button></form>
@@ -5075,6 +5161,355 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     setCatalogo(cats);
   });
 
+  /* ---------- clientes ----------
+     A loja sempre soube quem comprou e quem deixou o e-mail para receber
+     novidades — mas em dois lugares diferentes, e ninguém somava por pessoa.
+     Dava para ver pedido por pedido; não dava para ver que alguém já voltou
+     dez vezes. E era isso que faltava para tratar um cliente antigo diferente
+     de quem chegou agora.
+
+     A conta é feita no banco (clientes_loja) e chega pronta aqui. A última
+     resposta fica guardada no aparelho para a aba abrir com algo na tela
+     mesmo sem internet — podendo estar velha, e por isso a data aparece. */
+
+  var clientes = [];
+
+  function clientesGuardados(){
+    try{ return JSON.parse(load('p3d.clientes') || '{}'); }catch(e){ return {}; }
+  }
+  function guardaClientes(lista){
+    store('p3d.clientes', JSON.stringify({em: new Date().toISOString(), lista: lista}));
+  }
+
+  function buscaClientes(){
+    var s = sessao();
+    if(!s || !s.user_id) return Promise.resolve(false);
+
+    return api('/rest/v1/rpc/clientes_loja', {
+      method: 'POST',
+      body: JSON.stringify({p_usuario: s.user_id})
+    }, true).then(function(linhas){
+      clientes = linhas || [];
+      guardaClientes(clientes);
+      return true;
+    }).catch(function(e){
+      if(window.console) console.warn('Clientes nao vieram: ' + (e && e.message));
+      $('clientesHint').textContent = 'não consegui atualizar agora';
+      return false;
+    });
+  }
+
+  function clientesNaTela(){
+    var termo = ($('buscaCliente').value || '').trim().toLowerCase();
+    var ordem = $('ordemClientes').value;
+
+    var lista = clientes.filter(function(c){
+      if(!termo) return true;
+      return (c.email || '').toLowerCase().indexOf(termo) > -1 ||
+             (c.nome  || '').toLowerCase().indexOf(termo) > -1;
+    });
+
+    return lista.sort(function(a, b){
+      if(ordem === 'pedidos') return (b.pedidos||0) - (a.pedidos||0) || parseNum(b.gasto) - parseNum(a.gasto);
+      if(ordem === 'recente') return String(b.ultima_compra||'').localeCompare(String(a.ultima_compra||''));
+      if(ordem === 'nome')    return (a.nome||a.email||'').localeCompare(b.nome||b.email||'');
+      return parseNum(b.gasto) - parseNum(a.gasto);
+    });
+  }
+
+  function renderClientes(){
+    var guardado = clientesGuardados();
+    if(!clientes.length && guardado.lista) clientes = guardado.lista;
+
+    var compradores = clientes.filter(function(c){ return (c.pedidos||0) > 0; });
+    var faturado = compradores.reduce(function(t, c){ return t + parseNum(c.gasto); }, 0);
+    var naLista = clientes.filter(function(c){ return c.novidades; }).length;
+
+    $('clientesN').textContent = clientes.length ? ' ' + clientes.length : '';
+
+    $('tilesClientes').innerHTML = [
+      {k:'Pessoas', v:String(clientes.length), n:'que compraram ou deixaram o e-mail'},
+      {k:'Compraram', v:String(compradores.length), cls:'accent',
+       n:clientes.length ? Math.round(compradores.length/clientes.length*100) + '% da lista' : 'ninguém ainda'},
+      {k:'Faturado com eles', v:money(faturado), n:'pedidos pagos e entregues'},
+      {k:'Na lista de novidades', v:String(naLista), n:'recebem aviso de peça nova'}
+    ].map(function(t){
+      return '<div class="tile"><div class="k">' + t.k + '</div>' +
+             '<div class="v ' + (t.cls||'') + '">' + t.v + '</div>' +
+             '<div class="n">' + t.n + '</div></div>';
+    }).join('');
+
+    if(guardado.em){
+      $('clientesHint').textContent = 'atualizado ' + new Date(guardado.em).toLocaleString('pt-BR');
+    }
+
+    var lista = clientesNaTela();
+    var alvo = $('listaClientes');
+
+    if(!clientes.length){
+      alvo.innerHTML = '<p class="empty">' + (prontoParaSync()
+        ? 'Ninguém ainda. Assim que a primeira compra ou o primeiro cadastro na lista chegar, ele aparece aqui.'
+        : 'Conecte a nuvem para ver quem compra na loja.') + '</p>';
+      return;
+    }
+    if(!lista.length){
+      alvo.innerHTML = '<p class="empty">Ninguém com esse nome ou e-mail.</p>';
+      return;
+    }
+
+    alvo.innerHTML = '<div style="overflow-x:auto"><table class="tbl"><thead><tr>' +
+      '<th>Pessoa</th><th class="n">Compras</th><th class="n">Gasto</th>' +
+      '<th class="n">Ticket</th><th>Última</th><th></th></tr></thead><tbody>' +
+      lista.map(function(c){
+        // Quem só deixou o e-mail aparece mais apagado: ainda não é cliente, e
+        // misturar os dois faria a lista parecer maior do que a realidade.
+        var comprou = (c.pedidos||0) > 0;
+        var marcas = [];
+        if(c.novidades) marcas.push('<span class="sub" title="Recebe aviso de peça nova">lista</span>');
+        if((c.em_aberto||0) > 0) marcas.push('<span class="sub" style="color:var(--warn)" title="Pedido feito e ainda não pago">' +
+          c.em_aberto + ' em aberto</span>');
+        if((c.cupons_ativos||0) > 0) marcas.push('<span class="sub" style="color:var(--accent)" title="Cupons no nome desta pessoa, ainda valendo">' +
+          c.cupons_ativos + (c.cupons_ativos > 1 ? ' cupons' : ' cupom') + '</span>');
+
+        return '<tr' + (comprou ? '' : ' style="opacity:.62"') + '>' +
+          '<td><b>' + escapa(c.nome || String(c.email).split('@')[0]) + '</b>' +
+            '<br><span class="sub">' + escapa(c.email) + '</span>' +
+            (marcas.length ? '<br>' + marcas.join(' · ') : '') + '</td>' +
+          '<td class="n">' + (comprou ? c.pedidos : '—') + '</td>' +
+          '<td class="n">' + (comprou ? money(parseNum(c.gasto)) : '—') + '</td>' +
+          '<td class="n">' + (comprou ? money(parseNum(c.ticket)) : '—') + '</td>' +
+          '<td>' + (c.ultima_compra ? brData(String(c.ultima_compra).slice(0,10)) : '—') + '</td>' +
+          '<td><div class="acts">' +
+            (c.telefone
+              ? '<a class="btn tiny" href="' + escapa(linkWhatsapp(c.telefone, '')) +
+                '" target="_blank" rel="noopener" title="Abrir conversa">WhatsApp</a>'
+              : '') +
+            '<button class="btn tiny" data-cupom-para="' + escapa(c.email) + '" type="button" ' +
+              'title="Criar um cupom só para esta pessoa">Cupom</button>' +
+          '</div></td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
+  $('buscaCliente').addEventListener('input', renderClientes);
+  $('ordemClientes').addEventListener('change', renderClientes);
+  $('btnAtualizaClientes').addEventListener('click', function(){
+    $('clientesHint').textContent = 'atualizando…';
+    buscaClientes().then(renderClientes);
+  });
+
+  /* ---------- cupom no nome de uma pessoa ----------
+     Um cupom solto vira desconto para a rua inteira: basta alguém colar o
+     código num grupo. Por isso este nasce preso a um e-mail — o banco confere
+     quem está comprando antes de aplicar — e com uso único.
+
+     O código é sorteado, não montado a partir do nome: "GUILHERME10" seria
+     adivinhável por qualquer um que conheça a pessoa. */
+
+  var cupomPara = null;   // { email, nome }
+
+  function codigoDeCupom(prefixo){
+    // Sem I, O, 0 e 1: no papel e na tela, uma vira a outra.
+    var alfabeto = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', s = '';
+    for(var i = 0; i < 5; i++) s += alfabeto.charAt(Math.floor(Math.random() * alfabeto.length));
+    return (prefixo || 'VIP') + s;
+  }
+
+  function avisoCupomPessoal(txt){
+    var el = $('cupPesAviso');
+    if(el) el.textContent = txt || '';
+  }
+
+  function abreCupomPessoal(email){
+    var c = clientes.filter(function(x){ return x.email === email; })[0];
+    if(!c) return;
+
+    cupomPara = { email: c.email, nome: c.nome || String(c.email).split('@')[0] };
+
+    var quem = (c.pedidos||0) > 0
+      ? c.pedidos + (c.pedidos === 1 ? ' compra' : ' compras') + ' · ' + money(parseNum(c.gasto)) + ' gastos'
+      : 'ainda não comprou · está na lista de novidades';
+
+    $('cupPesSub').textContent = cupomPara.nome + ' · ' + c.email + ' · ' + quem;
+    $('cupPesTipo').value = 'percentual';
+    $('cupPesValor').value = '10';
+    $('cupPesMinimo').value = '';
+    $('cupPesDias').value = '60';
+    // Primeira compra e cliente que já voltou não merecem o mesmo texto: o
+    // motivo entra sugerido, e você ajusta.
+    $('cupPesMotivo').value = (c.pedidos||0) > 0
+      ? 'Obrigado por voltar — já são ' + c.pedidos + (c.pedidos === 1 ? ' compra' : ' compras') + ' com a gente.'
+      : 'Um desconto para a sua primeira compra.';
+    $('cupPesCodigo').value = codigoDeCupom((c.pedidos||0) > 0 ? 'VOLTA' : 'NOVO');
+    ajustaCampoValorCupom();
+    avisoCupomPessoal('');
+    $('dlgCupomPessoal').showModal();
+  }
+
+  function ajustaCampoValorCupom(){
+    var tipo = $('cupPesTipo').value;
+    $('cupPesCampoValor').style.display = tipo === 'frete' ? 'none' : '';
+    $('cupPesSufixo').textContent = tipo === 'percentual' ? '%' : 'R$';
+  }
+  $('cupPesTipo').addEventListener('change', ajustaCampoValorCupom);
+
+  /* Cria o cupom e devolve o que foi criado, ou null se algo faltou. */
+  function criaCupomPessoal(){
+    var s = sessao();
+    if(!s || !s.user_id){ avisoCupomPessoal('Conecte a nuvem primeiro.'); return Promise.resolve(null); }
+    if(!cupomPara) return Promise.resolve(null);
+
+    var codigo = ($('cupPesCodigo').value || '').trim().toUpperCase();
+    if(!/^[A-Z0-9]+$/.test(codigo)){
+      avisoCupomPessoal('Código só com letras e números.');
+      return Promise.resolve(null);
+    }
+
+    var tipo = $('cupPesTipo').value;
+    var valor = tipo === 'frete' ? 0 : parseNum($('cupPesValor').value);
+    if(tipo !== 'frete' && !(valor > 0)){
+      avisoCupomPessoal('Diga quanto o cupom desconta.');
+      return Promise.resolve(null);
+    }
+    if(tipo === 'percentual' && valor > 90){
+      avisoCupomPessoal('Acima de 90% não é aceito.');
+      return Promise.resolve(null);
+    }
+
+    var dias = parseInt($('cupPesDias').value, 10);
+    var vence = dias > 0 ? addDias(hojeISO(), dias) : null;
+    var motivo = ($('cupPesMotivo').value || '').trim();
+
+    var corpo = {
+      usuario: s.user_id,
+      codigo: codigo,
+      tipo: tipo,
+      valor: valor,
+      minimo: parseNum($('cupPesMinimo').value) || 0,
+      ativo: true,
+      expira_em: vence,
+      // Uso único e com dono: as duas coisas que separam um presente de uma
+      // promoção que vazou.
+      usos_max: 1,
+      email: cupomPara.email,
+      descricao: motivo || ('Cupom pessoal para ' + cupomPara.email)
+    };
+
+    avisoCupomPessoal('Criando…');
+    return api('/rest/v1/cupons', {
+      method: 'POST',
+      headers: {'Prefer': 'return=minimal'},
+      body: JSON.stringify(corpo)
+    }, true).then(function(){
+      return { codigo: codigo, tipo: tipo, valor: valor, vence: vence, motivo: motivo };
+    }).catch(function(e){
+      var m = e && e.message ? e.message : 'erro';
+      avisoCupomPessoal(/duplicate|already exists|23505/i.test(m)
+        ? 'Já existe um cupom com esse código — sorteie outro.'
+        : /email|PGRST204/i.test(m)
+          ? 'O banco ainda não conhece cupom com dono. Rode o supabase-clientes.sql.'
+          : 'Não deu para criar: ' + m);
+      return null;
+    });
+  }
+
+  function fraseDoCupom(c){
+    return c.tipo === 'frete' ? 'frete grátis'
+         : c.tipo === 'percentual' ? num(c.valor, 0) + '% de desconto'
+         : money(c.valor) + ' de desconto';
+  }
+
+  function recadoDoCupom(c){
+    var q = String.fromCharCode(10);
+    return (c.motivo ? c.motivo + q + q : '') +
+      'Seu cupom: ' + c.codigo + ' (' + fraseDoCupom(c) + ')' +
+      (c.vence ? q + 'Vale até ' + brData(c.vence) : '') +
+      q + q + 'É só digitar no carrinho usando o e-mail ' + cupomPara.email +
+      ' — o cupom está no seu nome e não funciona em outro.';
+  }
+
+  /* Copia e diz se conseguiu.
+
+     A área de transferência recusa quando a janela não está em foco, e a
+     recusa vem como promessa rejeitada — que ninguém pegava. O aviso dizia
+     "já está copiado" com a área vazia, e o código do cupom se perdia ali
+     mesmo. Quando falha, o texto aparece num prompt para copiar na mão. */
+  function copiaTexto(txt){
+    var naMao = function(){
+      prompt('Copie o recado:', txt);
+      return false;
+    };
+    try{
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        return navigator.clipboard.writeText(txt)
+          .then(function(){ return true; })
+          .catch(naMao);
+      }
+    }catch(e){}
+    return Promise.resolve(naMao());
+  }
+
+  $('cupPesCriar').addEventListener('click', function(){
+    criaCupomPessoal().then(function(c){
+      if(!c) return;
+      var quem = cupomPara;
+      $('dlgCupomPessoal').close();
+      copiaTexto(recadoDoCupom(c)).then(function(copiou){
+        alert('Cupom ' + c.codigo + ' criado para ' + quem.nome + '.' +
+              (copiou ? ' O recado já está copiado — é só colar no WhatsApp.' : ''));
+        buscaClientes().then(renderClientes);
+      });
+    });
+  });
+
+  $('cupPesCriarEnviar').addEventListener('click', function(){
+    var cfg = cfgNuvem();
+    if(!cfg.loja || !cfg.cronChave){
+      avisoCupomPessoal('Falta o endereço da loja ou a chave dos e-mails, em Nuvem.');
+      return;
+    }
+
+    criaCupomPessoal().then(function(c){
+      if(!c) return;
+      var quem = cupomPara;
+      avisoCupomPessoal('Enviando…');
+
+      // O cupom já existe daqui para frente. Se o e-mail falhar, o código não
+      // pode se perder junto — ele vai para a área de transferência.
+      function porWhatsapp(motivo){
+        $('dlgCupomPessoal').close();
+        copiaTexto(recadoDoCupom(c)).then(function(copiou){
+          alert('O cupom ' + c.codigo + ' foi criado e já está valendo, mas o ' +
+                'e-mail não saiu (' + motivo + ').' +
+                (copiou ? ' Copiei o recado para você mandar por WhatsApp.' : ''));
+          buscaClientes().then(renderClientes);
+        });
+      }
+
+      return fetch(cfg.loja + '/api/cupom/enviar', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'x-cron-secret': cfg.cronChave},
+        body: JSON.stringify({codigo: c.codigo, nome: quem.nome, motivo: c.motivo})
+      }).then(function(r){
+        return r.json().then(function(j){
+          if(j && j.ok){
+            $('dlgCupomPessoal').close();
+            alert('Cupom ' + c.codigo + ' criado e enviado para ' + quem.email + '.');
+            buscaClientes().then(renderClientes);
+          } else {
+            porWhatsapp((j && j.recado) || ('a loja respondeu ' + r.status));
+          }
+        });
+      }).catch(function(){
+        porWhatsapp('não consegui falar com a loja');
+      });
+    });
+  });
+
+  $('listaClientes').addEventListener('click', function(e){
+    var b = e.target.closest('[data-cupom-para]');
+    if(b) abreCupomPessoal(b.dataset.cupomPara);
+  });
+
   /* ---------- cupons da loja ----------
      Administrados daqui em vez de por SQL. O app já entra no Supabase como
      dono da conta, e a regra da tabela deixa o dono ler e escrever os
@@ -6081,7 +6516,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 
   /* ---------- abas ----------
      Lista única: quem adicionar aba nova mexe só aqui. */
-  var ABAS = ['calc','avisos','gestao','orcamentos','catalogo','estoque'];
+  var ABAS = ['calc','avisos','gestao','orcamentos','clientes','catalogo','estoque'];
   function trocaAba(qual){
     if(ABAS.indexOf(qual) < 0) qual = 'calc';
     ABAS.forEach(function(v){
@@ -6098,6 +6533,12 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       // que estava na tela da última sincronização.
       buscaOrcamentos().then(renderOrcamentos);
       buscaAvaliacoes().then(renderAvaliacoes);
+    }
+    if(qual === 'clientes'){
+      renderClientes();
+      // Busca ao abrir: quem clica aqui quer ver quem comprou hoje, nao o
+      // que estava na tela na ultima vez.
+      buscaClientes().then(renderClientes);
     }
     if(qual === 'catalogo') renderCatalogo();
     if(qual === 'estoque'){ renderEstoque(); mostraAnalise(); }
