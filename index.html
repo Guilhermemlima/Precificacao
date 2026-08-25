@@ -1289,7 +1289,13 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
           <option value="recente">Compra mais recente</option>
           <option value="nome">Nome</option>
         </select>
+        <select id="filtroClientes" style="width:auto">
+          <option value="">Todo mundo</option>
+          <option value="clientes">Só quem já comprou</option>
+          <option value="interessados">Só quem ainda não comprou</option>
+        </select>
         <button class="btn" type="button" id="btnAtualizaClientes">Atualizar</button>
+        <button class="btn primary" type="button" id="btnCampanha">Convidar com cupom</button>
       </div>
       <p class="note" style="margin-bottom:14px">
         A lista junta duas coisas que estavam separadas: quem comprou e quem só
@@ -1363,6 +1369,61 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 </div>
 
 </div>
+
+<dialog id="dlgCampanha">
+  <form method="dialog" class="dlg-x"><button class="btn tiny ghost" type="submit">Fechar</button></form>
+  <h2 class="dlg-t">Convidar com cupom</h2>
+  <p class="dlg-s" id="campSub">Para quem se cadastrou e ainda não comprou.</p>
+  <div class="dlg-passo">
+    <div class="row">
+      <div class="f">
+        <label for="campAlvo">Mandar para</label>
+        <div class="inp"><select id="campAlvo">
+          <option value="interessados">Quem ainda não comprou</option>
+          <option value="todos">A lista inteira</option>
+        </select></div>
+      </div>
+      <div class="f">
+        <label for="campTipo">O cupom dá</label>
+        <div class="inp"><select id="campTipo">
+          <option value="percentual">Desconto em %</option>
+          <option value="valor">Desconto em R$</option>
+          <option value="frete">Frete grátis</option>
+        </select></div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="f" id="campCampoValor">
+        <label for="campValor">Quanto</label>
+        <div class="inp"><input type="text" inputmode="decimal" id="campValor" value="15"><span class="suf" id="campSufixo">%</span></div>
+      </div>
+      <div class="f">
+        <label for="campMinimo">Compra mínima</label>
+        <div class="inp"><span class="pre">R$</span><input type="text" inputmode="decimal" id="campMinimo" placeholder="0,00"></div>
+      </div>
+      <div class="f">
+        <label for="campDias">Vale por</label>
+        <div class="inp"><input type="text" inputmode="numeric" id="campDias" value="15"><span class="suf">dias</span></div>
+      </div>
+    </div>
+    <div class="f" style="margin-top:12px">
+      <label for="campMensagem">A mensagem</label>
+      <textarea class="txt" id="campMensagem" rows="7" style="width:100%"></textarea>
+      <span class="sub">O código, o prazo e a saída da lista entram sozinhos embaixo do texto.</span>
+    </div>
+    <p class="note">
+      Cada pessoa recebe <b>um cupom próprio</b>, no nome dela e de uso único.
+      Um código só para a lista inteira viraria desconto público assim que
+      alguém colasse num grupo — e aí ele deixa de ser convite e vira o preço
+      novo da loja. Quem já tem cupom valendo fica de fora desta.
+    </p>
+  </div>
+  <div class="dlg-acts">
+    <span class="sub" id="campAviso" style="margin-right:auto"></span>
+    <button class="btn" id="campContar" type="button">Ver quantos recebem</button>
+    <button class="btn primary" id="campEnviar" type="button">Enviar</button>
+  </div>
+</dialog>
 
 <dialog id="dlgCupomPessoal">
   <form method="dialog" class="dlg-x"><button class="btn tiny ghost" type="submit">Fechar</button></form>
@@ -5202,8 +5263,13 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   function clientesNaTela(){
     var termo = ($('buscaCliente').value || '').trim().toLowerCase();
     var ordem = $('ordemClientes').value;
+    var so = $('filtroClientes').value;
 
     var lista = clientes.filter(function(c){
+      // Quem só deixou o e-mail e quem já comprou são dois grupos com
+      // conversas diferentes — o filtro existe para você olhar um de cada vez.
+      if(so === 'clientes'     && !(c.pedidos > 0)) return false;
+      if(so === 'interessados' &&   c.pedidos > 0)  return false;
       if(!termo) return true;
       return (c.email || '').toLowerCase().indexOf(termo) > -1 ||
              (c.nome  || '').toLowerCase().indexOf(termo) > -1;
@@ -5292,9 +5358,161 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 
   $('buscaCliente').addEventListener('input', renderClientes);
   $('ordemClientes').addEventListener('change', renderClientes);
+  $('filtroClientes').addEventListener('change', renderClientes);
   $('btnAtualizaClientes').addEventListener('click', function(){
     $('clientesHint').textContent = 'atualizando…';
     buscaClientes().then(renderClientes);
+  });
+
+  /* ---------- convite com cupom para a lista ----------
+     Gente que se cadastrou, deu uma olhada e nunca comprou é o grupo mais
+     barato de trazer de volta: ela já disse que tem interesse. O que faltava
+     era um jeito de falar com esse grupo sem virar disparo de promoção.
+
+     Cada pessoa recebe um cupom próprio, no nome dela. Um código único para a
+     lista inteira vira desconto público assim que alguém cola num grupo — e aí
+     ele deixa de ser convite e passa a ser o preço da loja.
+
+     Quem escreve a mensagem é você. Um texto de máquina numa lista pequena,
+     onde a pessoa já falou com você por WhatsApp, soa pior do que não mandar. */
+
+  var MENSAGEM_PADRAO =
+    'Você se cadastrou para receber as novidades da Moldarte 3D e ainda não ' +
+    'levou nenhuma peça — então separei um desconto para a sua primeira.\n\n' +
+    'Cada peça é impressa uma a uma por aqui, e dá para escolher a cor. Se ' +
+    'tiver dúvida sobre tamanho, prazo ou quiser algo diferente do que está ' +
+    'no site, é só responder este e-mail que eu respondo.';
+
+  function avisoCampanha(txt){
+    var el = $('campAviso');
+    if(el) el.textContent = txt || '';
+  }
+
+  function ajustaCampoValorCampanha(){
+    var tipo = $('campTipo').value;
+    $('campCampoValor').style.display = tipo === 'frete' ? 'none' : '';
+    $('campSufixo').textContent = tipo === 'percentual' ? '%' : 'R$';
+  }
+  $('campTipo').addEventListener('change', ajustaCampoValorCampanha);
+  $('campAlvo').addEventListener('change', function(){
+    $('campSub').textContent = this.value === 'todos'
+      ? 'Para todo mundo que está na lista de novidades.'
+      : 'Para quem se cadastrou e ainda não comprou.';
+    avisoCampanha('');
+  });
+
+  $('btnCampanha').addEventListener('click', function(){
+    var cfg = cfgNuvem();
+    if(!cfg.loja || !cfg.cronChave){
+      alert('Falta o endereço da loja ou a chave dos e-mails. Preencha no botão Nuvem.');
+      return;
+    }
+    if(!$('campMensagem').value.trim()) $('campMensagem').value = MENSAGEM_PADRAO;
+    ajustaCampoValorCampanha();
+    avisoCampanha('');
+    $('dlgCampanha').showModal();
+  });
+
+  /* Monta o que vai na chamada, ou null se faltar alguma coisa. */
+  function corpoDaCampanha(){
+    var tipo = $('campTipo').value;
+    var valor = tipo === 'frete' ? 0 : parseNum($('campValor').value);
+
+    if(tipo !== 'frete' && !(valor > 0)){
+      avisoCampanha('Diga quanto o cupom desconta.');
+      return null;
+    }
+    if(tipo === 'percentual' && valor > 90){
+      avisoCampanha('Acima de 90% não é aceito.');
+      return null;
+    }
+
+    return {
+      alvo: $('campAlvo').value,
+      tipo: tipo,
+      valor: valor,
+      minimo: parseNum($('campMinimo').value) || 0,
+      dias: parseInt($('campDias').value, 10) || 15,
+      mensagem: ($('campMensagem').value || '').trim()
+    };
+  }
+
+  function chamaCampanha(extra){
+    var cfg = cfgNuvem();
+    var corpo = corpoDaCampanha();
+    if(!corpo) return Promise.resolve(null);
+
+    return fetch(cfg.loja + '/api/campanha', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', 'x-cron-secret': cfg.cronChave},
+      body: JSON.stringify(Object.assign(corpo, extra))
+    }).then(function(r){
+      return r.json().then(function(j){
+        if(!r.ok || !j.ok) throw new Error(j.recado || ('a loja respondeu ' + r.status));
+        return j;
+      });
+    });
+  }
+
+  $('campContar').addEventListener('click', function(){
+    avisoCampanha('Conferindo…');
+    chamaCampanha({simular:true}).then(function(j){
+      if(!j) return;
+      avisoCampanha(j.naLista
+        ? j.naLista + (j.naLista === 1 ? ' pessoa recebe' : ' pessoas recebem') +
+          (j.deFora ? ' · ' + j.quantos + ' neste envio, ' + j.deFora + ' na próxima vez' : '')
+        : 'Ninguém se encaixa neste filtro agora.');
+    }).catch(function(e){
+      avisoCampanha('Não consegui conferir: ' + (e && e.message));
+    });
+  });
+
+  $('campEnviar').addEventListener('click', function(){
+    var corpo = corpoDaCampanha();
+    if(!corpo) return;
+    if(corpo.mensagem.length < 20){
+      avisoCampanha('Escreva a mensagem — ela é o convite.');
+      $('campMensagem').focus();
+      return;
+    }
+
+    avisoCampanha('Conferindo…');
+    // Conta antes de mandar: e-mail enviado não volta, e a confirmação
+    // precisa dizer para quantas pessoas, não "para a lista".
+    chamaCampanha({simular:true}).then(function(j){
+      if(!j) return;
+      if(!j.naLista){
+        avisoCampanha('Ninguém se encaixa neste filtro agora.');
+        return;
+      }
+
+      var oque = corpo.tipo === 'frete' ? 'frete grátis'
+               : corpo.tipo === 'percentual' ? num(corpo.valor, 0) + '%'
+               : money(corpo.valor);
+
+      var ok = confirm(
+        'Mandar um cupom de ' + oque + ' para ' + j.quantos +
+        (j.quantos === 1 ? ' pessoa' : ' pessoas') + '?' +
+        (j.deFora ? ' (as outras ' + j.deFora + ' ficam para a próxima vez)' : '') +
+        ' Cada uma recebe um código próprio, e e-mail enviado não volta atrás.'
+      );
+      if(!ok){ avisoCampanha(''); return; }
+
+      avisoCampanha('Enviando…');
+      return chamaCampanha({}).then(function(f){
+        if(!f) return;
+        $('dlgCampanha').close();
+        alert('Enviados: ' + f.enviados + ' de ' + f.quantos + '.' +
+              (f.deFora ? ' Faltaram ' + f.deFora + ' — clique de novo para mandar para elas.' : '') +
+              ((f.falhas && f.falhas.length)
+                ? ' O cupom destes foi criado mas o e-mail não saiu: ' + f.falhas.join(', ') +
+                  ' — dá para passar o código por WhatsApp pela aba Cupons.'
+                : ''));
+        buscaClientes().then(renderClientes);
+      });
+    }).catch(function(e){
+      avisoCampanha('Não deu certo: ' + (e && e.message));
+    });
   });
 
   /* ---------- cupom no nome de uma pessoa ----------
