@@ -3297,7 +3297,20 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     var noSite = p.status === 'entregue' ? 'entregue'
                : p.status === 'pago'     ? 'pago'
                : 'reservado';
-    api('/rest/v1/pedidos_loja?id=eq.' + encodeURIComponent(p.pedidoLoja), {
+
+    // Voltar um pedido para "aguardando" mandava 'reservado' para a loja, e
+    // la isso e um pedido esperando pagamento: o faxineiro de reservas
+    // vencidas via a data de 24h ja no passado, devolvia as pecas ao estoque
+    // e marcava o pedido como expirado. Um pedido pago virava peca de volta
+    // na prateleira sozinho, em ate 15 minutos, sem aviso nenhum.
+    //
+    // Por isso a volta atras so vale para pedido que a loja ainda tem como
+    // reservado. Quem ja pagou fica pago la; desfazer venda paga e cancelar,
+    // e cancelar tem caminho proprio, que devolve estoque e cobranca.
+    var alvo = '/rest/v1/pedidos_loja?id=eq.' + encodeURIComponent(p.pedidoLoja) +
+               (noSite === 'reservado' ? '&status=eq.reservado' : '');
+
+    api(alvo, {
       method:'PATCH',
       headers:{'Prefer':'return=minimal'},
       body: JSON.stringify({status: noSite})
@@ -4622,9 +4635,18 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
         return;
       }
 
+      // Se a lista passar do lote da loja, o aviso sai só para uma parte.
+      // Melhor dizer isso antes do que você achar que a lista inteira foi
+      // avisada e ninguém contar o contrário.
+      var sobra = j.deFora
+        ? '\n\nAtenção: a lista tem ' + j.naLista + ' pessoas, mas cada envio ' +
+          'alcança ' + j.quantos + '. As outras ' + j.deFora + ' não recebem ' +
+          'desta vez.'
+        : '';
+
       var ok = confirm(
         'Mandar o aviso de "' + linha.nome + '" para ' + j.quantos +
-        (j.quantos === 1 ? ' pessoa' : ' pessoas') + '?\n\n' +
+        (j.quantos === 1 ? ' pessoa' : ' pessoas') + '?' + sobra + '\n\n' +
         'E-mail enviado não volta atrás.'
       );
       if(!ok) return;
