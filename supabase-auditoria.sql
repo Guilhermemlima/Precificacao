@@ -46,6 +46,43 @@ with checagens as (
     ('correcao do preco (faixa de 1 un)', 'supabase-preco.sql',
       exists(select 1 from pg_proc where proname='criar_pedido' and prosrc like '%> 1%')),
 
+    -- o desconto do Pix (supabase-pix.sql)
+    ('col desconto_pix', 'supabase-pix.sql',
+      exists(select 1 from information_schema.columns
+              where table_name='pedidos_loja' and column_name='desconto_pix')),
+    ('criar_pedido conhece o Pix', 'supabase-pix.sql',
+      exists(select 1 from pg_proc
+              where proname='criar_pedido'
+                and pg_get_function_identity_arguments(oid) like '%p_desconto_pix%')),
+
+    -- clientes e cupom com dono (supabase-clientes.sql)
+    ('func clientes_loja', 'supabase-clientes.sql',
+      to_regproc('public.clientes_loja') is not null),
+    ('col email no cupom', 'supabase-clientes.sql',
+      exists(select 1 from information_schema.columns
+              where table_name='cupons' and column_name='email')),
+    ('valida_cupom confere o dono', 'supabase-clientes.sql',
+      exists(select 1 from pg_proc
+              where proname='valida_cupom'
+                and pg_get_function_identity_arguments(oid) like '%p_email%')),
+    -- Duas versoes vivas da mesma funcao deixam a chamada ambigua, e o
+    -- banco recusa as duas. So pode existir uma.
+    ('valida_cupom sem versao duplicada', 'supabase-clientes.sql',
+      (select count(*) from pg_proc where proname='valida_cupom') = 1),
+    ('criar_pedido sem versao duplicada', 'supabase-pix.sql',
+      (select count(*) from pg_proc where proname='criar_pedido') = 1),
+
+    -- pedidos de empresa (supabase-brindes.sql)
+    ('col empresa no orcamento', 'supabase-brindes.sql',
+      exists(select 1 from information_schema.columns
+              where table_name='orcamentos_loja' and column_name='empresa')),
+    ('col documento no orcamento', 'supabase-brindes.sql',
+      exists(select 1 from information_schema.columns
+              where table_name='orcamentos_loja' and column_name='documento')),
+    ('col origem no orcamento', 'supabase-brindes.sql',
+      exists(select 1 from information_schema.columns
+              where table_name='orcamentos_loja' and column_name='origem')),
+
     -- agendador
     ('extensao pg_cron',  'supabase-cron.sql', exists(select 1 from pg_extension where extname='pg_cron')),
     ('extensao pg_net',   'supabase-cron.sql', exists(select 1 from pg_extension where extname='pg_net')),
