@@ -2945,6 +2945,14 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     novo: 'Novo', respondido: 'Respondido', fechado: 'Virou pedido', perdido: 'Não fechou'
   };
 
+  /* CNPJ com pontuacao: 14 digitos seguidos ninguem confere de olho. */
+  function formataDoc(d){
+    var s = String(d || '').replace(/[^0-9]/g, '');
+    if(s.length === 14) return s.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+    if(s.length === 11) return s.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    return s;
+  }
+
   function renderOrcamentos(){
     pintaBadgeOrcamentos();
 
@@ -2966,12 +2974,20 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       if(o.prazo)      specs.push(o.prazo);
 
       var contato = [];
+      if(o.empresa && o.nome) contato.push(escapa(o.nome));
+      if(o.documento) contato.push(formataDoc(o.documento));
       if(o.telefone) contato.push(escapa(o.telefone));
       if(o.email)    contato.push('<a href="mailto:' + escapa(o.email) + '">' + escapa(o.email) + '</a>');
 
       return '<div class="orc ' + escapa(o.status) + '">' +
         '<div class="topo">' +
-          '<span class="quem">' + escapa(o.nome) + '</span>' +
+          // Pedido de empresa mostra a empresa em cima e a pessoa embaixo:
+          // ao bater o olho na lista, o que identifica o pedido é a marca,
+          // nao o nome de quem digitou o formulario.
+          '<span class="quem">' + escapa(o.empresa || o.nome) + '</span>' +
+          (o.origem === 'brindes'
+            ? '<span class="pill" style="background:var(--accent);color:var(--on-accent)">brindes</span>'
+            : '') +
           '<span class="pill">' + (ROTULO_ORC[o.status] || o.status) + '</span>' +
           '<span class="quando">' + escapa(o.id) + ' · ' + quando + '</span>' +
         '</div>' +
