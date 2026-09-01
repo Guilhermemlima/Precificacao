@@ -1640,6 +1640,11 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
         <div class="inp"><input class="txt" type="number" min="0" id="pubEstoque" value="999"></div>
         <span class="sub">999 = produzido sob demanda.</span>
       </div>
+      <div class="f">
+        <label for="pubPeso">Peso da peça (g)</label>
+        <div class="inp"><input class="txt" type="number" min="0" id="pubPeso" placeholder="0"><span class="suf">g</span></div>
+        <span class="sub">É ele que escolhe a faixa de frete na loja. Vem preenchido do cálculo.</span>
+      </div>
     </div>
     <p class="note" id="pubEscada"></p>
   </div>
@@ -2218,6 +2223,9 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   }
 
   function abrePublicar(){
+    // O peso do frete é o da peça pronta: os gramas do modelo. A purga fica
+    // de fora — ela vira lixo na bancada, não vai dentro da caixa.
+    $('pubPeso').value = Math.round(val('gramasPeca')) || '';
     var d = $('dlgPublicar');
     $('pubNome').value = $('nomePeca').value.trim();
     $('pubCat').innerHTML = opcoesDeCategoria();
@@ -2278,8 +2286,9 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     // Mesmo tamanho já cadastrado: atualiza o preço em vez de duplicar a linha.
     prod.vars = prod.vars || [];
     var v = prod.vars.find(function(x){ return (x.t||'').trim().toLowerCase() === tamanho.toLowerCase(); });
-    if(v) v.p = num(preco, 2);
-    else prod.vars.push({t:tamanho, p:num(preco, 2)});
+    var peso = Math.max(0, parseInt($('pubPeso').value, 10) || 0);
+    if(v){ v.p = num(preco, 2); v.g = peso; }
+    else prod.vars.push({t:tamanho, p:num(preco, 2), g:peso});
 
     prod.modo = prod.vars.length > 1 ? 'apartir' : 'unico';
     prod.pub = true;
@@ -2546,8 +2555,23 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
         usados[endereco] = true;
 
         var tamanhos = (prod.vars||[])
-          .map(function(v){ return {nome:(v.t||'').trim(), preco:parseNum(v.p)}; })
+          .map(function(v){
+            return {
+              nome: (v.t||'').trim(),
+              preco: parseNum(v.p),
+              // Peso da peça pronta, em gramas. É o que a loja usa para
+              // escolher a faixa de frete — tamanho G não viaja pelo
+              // preço do P.
+              pesoGramas: Math.max(0, parseInt(v.g, 10) || 0)
+            };
+          })
           .filter(function(v){ return v.preco > 0; });
+
+        // Peso base do produto: o menor entre os tamanhos que têm peso.
+        // É o que vale quando o cliente não escolheu tamanho nenhum.
+        var pesos = tamanhos.map(function(v){ return v.pesoGramas; })
+                            .filter(function(g){ return g > 0; });
+        var pesoBase = pesos.length ? Math.min.apply(null, pesos) : 0;
 
         var precos = tamanhos.map(function(v){ return v.preco; });
         var base = precos.length ? Math.min.apply(null, precos) : 0;
@@ -2575,7 +2599,10 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
           preco: consulta ? 0 : base,
           // A loja mostra o menor preço como base e os outros como adicional.
           tamanhos: consulta ? [] : tamanhos.map(function(v){
-            return {nome:v.nome, preco:v.preco, adicional: +(v.preco - base).toFixed(2)};
+            // O peso vai junto de cada tamanho: e ele que escolhe a faixa de
+            // frete quando o cliente escolhe o tamanho na pagina.
+            return {nome:v.nome, preco:v.preco, pesoGramas:v.pesoGramas,
+                    adicional: +(v.preco - base).toFixed(2)};
           }),
           // Leve mais, pague menos por unidade — as faixas da calculadora.
           faixas: consulta ? [] : escadaDeQuantidade(base),
@@ -2597,6 +2624,9 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
           estilo: (prod.estilo||'').trim(),
           caracteristicas: (prod.caract||'').trim(),
           prazoDias: Math.max(1, parseInt(prod.prazo, 10) || PRAZO_PADRAO),
+          // Zero significa 'não cadastrado': a loja aplica o peso padrão
+          // dela em vez de mandar a peça de graça na faixa mais barata.
+          pesoGramas: pesoBase,
           estoque: estoqueAgora,
           estoqueDefinidoEm: carimboDoEstoque
         });
