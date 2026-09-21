@@ -1725,6 +1725,17 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       <button class="btn" type="button" id="nvEnviarTudo" hidden>Enviar tudo deste aparelho</button>
     </div>
   </div>
+
+  <div class="dlg-passo">
+    <div class="mini-label">4 · Avisos no celular</div>
+    <p class="dlg-s">Pedido novo e pagamento confirmado chegam como notificação do aparelho, mesmo com o app fechado. Ative uma vez em cada aparelho onde quiser receber.</p>
+    <div id="nvPushStatus" class="nv-status"></div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap">
+      <button class="btn primary" type="button" id="nvPushLigar">Ativar neste aparelho</button>
+      <button class="btn ghost" type="button" id="nvPushDesligar" hidden>Desativar</button>
+      <button class="btn" type="button" id="nvPushTestar" hidden>Enviar teste</button>
+    </div>
+  </div>
 </dialog>
 
 <div id="tip"></div>
@@ -7395,6 +7406,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     $('nvCron').value = c.cronChave || '';
     if(s && s.email) $('nvEmail').value = s.email;
     statusNuvem();
+    statusAvisos();
     $('dlgNuvem').showModal();
   });
   $('nvEntrar').addEventListener('click', function(){
@@ -7495,6 +7507,164 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     estadoAnterior = s;
     _salvaEstado();
   };
+
+  /* ---------- avisos no celular ----------
+     O navegador entrega a notificação mesmo com o app fechado, então o
+     aviso não depende de ninguém abrir o site. Cada aparelho tem a sua
+     inscrição: ligar no celular não liga no computador, e vice-versa. */
+
+  var VAPID_PUBLICA = 'BLGrO6SQ-5dHtO9hmC_4drz1yuW1OqR2gmjh4aRZLelyRWAKsrmdBQg0L9-DWfQUDb5PjNKAocizLe8iyAanxJc';
+
+  // A chave viaja em base64url e o navegador exige bytes crus.
+  function chaveEmBytes(b64){
+    var pad = '='.repeat((4 - b64.length % 4) % 4);
+    var txt = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+    var bytes = new Uint8Array(txt.length);
+    for(var i = 0; i < txt.length; i++) bytes[i] = txt.charCodeAt(i);
+    return bytes;
+  }
+
+  function pushSuportado(){
+    // isSecureContext, e não "https:": localhost também é seguro, e é
+    // por ele que se testa antes de publicar.
+    return 'serviceWorker' in navigator && 'PushManager' in window &&
+           'Notification' in window && window.isSecureContext;
+  }
+
+  function apelidoDoAparelho(){
+    var ua = navigator.userAgent;
+    var sis = /android/i.test(ua) ? 'Android'
+            : /iphone|ipad/i.test(ua) ? 'iPhone'
+            : /windows/i.test(ua) ? 'Windows'
+            : /mac/i.test(ua) ? 'Mac' : 'Aparelho';
+    var nav = /edg/i.test(ua) ? 'Edge'
+            : /chrome/i.test(ua) ? 'Chrome'
+            : /firefox/i.test(ua) ? 'Firefox'
+            : /safari/i.test(ua) ? 'Safari' : 'navegador';
+    return sis + ' · ' + nav + (jaInstalado ? ' · instalado' : '');
+  }
+
+  function assinaturaAtual(){
+    if(!pushSuportado()) return Promise.resolve(null);
+    return navigator.serviceWorker.ready
+      .then(function(reg){ return reg.pushManager.getSubscription(); })
+      .catch(function(){ return null; });
+  }
+
+  function ligarAvisos(){
+    if(!pushSuportado()) return Promise.reject(new Error('Este navegador não entrega notificações. No iPhone, só funciona depois de adicionar o app à Tela de Início.'));
+    var s = sessao();
+    if(!s || !s.user_id) return Promise.reject(new Error('Entre na sua conta antes de ativar os avisos.'));
+
+    return Notification.requestPermission().then(function(resposta){
+      if(resposta !== 'granted'){
+        throw new Error(resposta === 'denied'
+          ? 'Você bloqueou as notificações para este site. Libere no cadeado ao lado do endereço e tente de novo.'
+          : 'Permissão não concedida.');
+      }
+      return navigator.serviceWorker.ready;
+    }).then(function(reg){
+      return reg.pushManager.getSubscription().then(function(ja){
+        // Uma inscrição antiga pode ter sido feita com outra chave; nesse
+        // caso o servidor não consegue mais falar com ela e é preciso
+        // refazer, senão o aviso some sem erro nenhum.
+        if(ja) return ja;
+        return reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: chaveEmBytes(VAPID_PUBLICA)
+        });
+      });
+    }).then(function(sub){
+      var j = sub.toJSON();
+      return api('/rest/v1/push_assinaturas?on_conflict=endpoint', {
+        method: 'POST',
+        headers: {'Prefer': 'resolution=merge-duplicates'},
+        body: JSON.stringify({
+          endpoint: j.endpoint,
+          usuario:  sessao().user_id,
+          p256dh:   j.keys.p256dh,
+          auth:     j.keys.auth,
+          aparelho: apelidoDoAparelho()
+        })
+      }, true);
+    });
+  }
+
+  function desligarAvisos(){
+    return assinaturaAtual().then(function(sub){
+      if(!sub) return null;
+      var alvo = sub.endpoint;
+      return sub.unsubscribe().then(function(){
+        return api('/rest/v1/push_assinaturas?endpoint=eq.' + encodeURIComponent(alvo),
+                   {method: 'DELETE'}, true);
+      });
+    });
+  }
+
+  function statusAvisos(){
+    var el = $('nvPushStatus');
+    if(!el) return;
+    var ligar = $('nvPushLigar'), desligar = $('nvPushDesligar'), testar = $('nvPushTestar');
+
+    if(!pushSuportado()){
+      el.innerHTML = '<div class="l">Este navegador não entrega notificações.' +
+        (!window.isSecureContext ? ' Abra o site pelo endereço https.' : '') + '</div>';
+      ligar.hidden = true; desligar.hidden = true; testar.hidden = true;
+      return;
+    }
+
+    assinaturaAtual().then(function(sub){
+      var linhas = [];
+      var permissao = Notification.permission;
+
+      if(permissao === 'denied'){
+        linhas.push('<div class="l"><span class="er">✗</span> Notificações bloqueadas para este site. Libere no cadeado ao lado do endereço.</div>');
+      } else if(sub){
+        linhas.push('<div class="l"><span class="ok">✓</span> Este aparelho receberá avisos.</div>');
+        linhas.push('<div class="l" style="color:var(--muted)">' + escapa(apelidoDoAparelho()) + '</div>');
+      } else {
+        linhas.push('<div class="l">Este aparelho ainda não recebe avisos.</div>');
+      }
+      if(!jaInstalado && /android/i.test(navigator.userAgent)){
+        linhas.push('<div class="l" style="color:var(--muted)">Funciona pelo navegador; instalado, chega mais rápido e sobrevive à limpeza de abas.</div>');
+      }
+
+      el.innerHTML = linhas.join('');
+      ligar.hidden    = !!sub || permissao === 'denied';
+      desligar.hidden = !sub;
+      testar.hidden   = !sub;
+    });
+  }
+
+  function comBotaoPush(btn, rotulo, promessa){
+    var antes = btn.textContent;
+    btn.disabled = true; btn.textContent = rotulo;
+    promessa.then(function(){
+      btn.textContent = 'Pronto';
+    }).catch(function(e){
+      $('nvPushStatus').innerHTML = '<div class="l"><span class="er">✗</span> ' + escapa(e.message || String(e)) + '</div>';
+      btn.textContent = 'Falhou';
+    }).then(function(){
+      setTimeout(function(){ btn.disabled = false; btn.textContent = antes; statusAvisos(); }, 1800);
+    });
+  }
+
+  $('nvPushLigar').addEventListener('click', function(){
+    comBotaoPush(this, 'Ativando…', ligarAvisos());
+  });
+  $('nvPushDesligar').addEventListener('click', function(){
+    comBotaoPush(this, 'Desativando…', desligarAvisos());
+  });
+  $('nvPushTestar').addEventListener('click', function(){
+    // Teste local: não passa pelo servidor. Serve para conferir se o
+    // aparelho mostra a notificação; o envio de verdade é testado pelo SQL.
+    comBotaoPush(this, 'Enviando…', navigator.serviceWorker.ready.then(function(reg){
+      return reg.showNotification('Precifica 3D', {
+        body: 'Teste local: o aparelho está exibindo notificações.',
+        icon: './icons/icon192.png', badge: './icons/icon192.png', tag: 'teste'
+      });
+    }));
+  });
 
   /* ---------- app instalável ----------
      Só funciona servido por http(s): abrindo o arquivo direto (file://) o

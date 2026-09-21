@@ -62,3 +62,45 @@ self.addEventListener('fetch', function(e){
     })
   );
 });
+
+/* ---------- notificações ----------
+   Este trecho roda mesmo com o app fechado: o navegador acorda o
+   service worker só para entregar o aviso. É o que faz a notificação
+   chegar no celular, e não apenas dentro da página aberta. */
+
+self.addEventListener('push', function(e){
+  var d = {};
+  try{ d = e.data ? e.data.json() : {}; }catch(err){ d = {titulo:'Precifica 3D', corpo: e.data ? e.data.text() : ''}; }
+
+  e.waitUntil(
+    self.registration.showNotification(d.titulo || 'Precifica 3D', {
+      body: d.corpo || '',
+      icon: './icons/icon192.png',
+      badge: './icons/icon192.png',
+      // A marca agrupa avisos do mesmo pedido: uma atualização
+      // substitui a anterior em vez de empilhar três notificações.
+      tag: d.marca || 'precifica',
+      renotify: true,
+      data: { url: d.url || './' }
+    })
+  );
+});
+
+self.addEventListener('notificationclick', function(e){
+  e.notification.close();
+  var destino = (e.notification.data && e.notification.data.url) || './';
+
+  // Se o app já estiver aberto em algum lugar, traz aquela janela para
+  // frente em vez de abrir uma segunda cópia.
+  e.waitUntil(
+    self.clients.matchAll({type:'window', includeUncontrolled:true}).then(function(janelas){
+      for(var i = 0; i < janelas.length; i++){
+        if(janelas[i].url.indexOf(self.location.origin) === 0 && 'focus' in janelas[i]){
+          janelas[i].navigate && janelas[i].navigate(destino);
+          return janelas[i].focus();
+        }
+      }
+      return self.clients.openWindow(destino);
+    })
+  );
+});

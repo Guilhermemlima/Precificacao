@@ -7,3 +7,6 @@ precifica-3d.json
 # Windows
 Thumbs.db
 desktop.ini
+
+# chave privada das notificacoes - NUNCA versionar
+vapid-chaves.txt
