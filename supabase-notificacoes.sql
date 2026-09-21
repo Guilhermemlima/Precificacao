@@ -78,16 +78,22 @@ declare
   titulo  text;
   corpo   text;
   nome    text;
+  valor   text;
 begin
   nome := coalesce(nullif(new.cliente->>'nome', ''), 'Cliente');
 
+  -- translate troca ponto por vírgula e vice-versa de uma vez. Sem isso o
+  -- valor sairia no formato do servidor (249.90), e não no nosso (249,90):
+  -- as letras G e D do to_char seguem a configuração regional do banco.
+  valor := 'R$ ' || translate(to_char(new.total, 'FM999,999,990.00'), ',.', '.,');
+
   if tg_op = 'INSERT' then
     titulo := 'Pedido novo na loja';
-    corpo  := nome || ' · ' || to_char(new.total, 'FM999G999D00') || ' · aguardando pagamento';
+    corpo  := nome || ' · ' || valor || ' · aguardando pagamento';
 
   elsif new.status = 'pago' and coalesce(old.status, '') <> 'pago' then
     titulo := 'Pagamento confirmado';
-    corpo  := nome || ' pagou ' || to_char(new.total, 'FM999G999D00') || ' · pode produzir';
+    corpo  := nome || ' pagou ' || valor || ' · pode produzir';
 
   else
     return new;   -- qualquer outra alteração não vira aviso
@@ -122,16 +128,26 @@ create trigger pedidos_loja_avisa
 --  Para conferir sem precisar de um pedido de verdade, troque o
 --  endereço e o segredo abaixo e rode só este trecho. Deve chegar
 --  uma notificação no celular em alguns segundos.
+--
+--  O dono sai da própria tabela de assinaturas. No SQL Editor você
+--  roda como postgres, não como usuário logado, então auth.uid()
+--  viria nulo e a função recusaria a chamada.
 -- ------------------------------------------------------------
 -- select net.http_post(
 --   url     := 'https://SEU-PROJETO.supabase.co/functions/v1/notificar',
 --   headers := jsonb_build_object('Content-Type','application/json',
 --                                 'x-notificar-segredo','O-SEGREDO'),
 --   body    := jsonb_build_object(
---                'usuario', auth.uid(),
+--                'usuario', (select usuario from public.push_assinaturas
+--                             order by criado_em desc limit 1),
 --                'titulo',  'Teste do Precifica',
 --                'corpo',   'Se você está lendo isto, as notificações funcionam.')
 -- );
+--
+-- Uns 5 segundos depois, veja o que a função respondeu:
+--   select status_code, content from net._http_response
+--    order by created desc limit 3;
+-- Esperado: 200 e algo como {"enviados":1,"removidos":0}
 
 -- ------------------------------------------------------------
 --  4 · Conferência
