@@ -146,6 +146,30 @@ function banco(caminho: string, opcoes: RequestInit = {}) {
 
 /* ---------- a função ---------- */
 Deno.serve(async (req: Request) => {
+  // Abrir o endereço no navegador cai aqui e vira uma conferência: diz
+  // quais segredos chegaram, sem nunca mostrar o valor de nenhum deles.
+  // SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY não se cadastram — o
+  // Supabase injeta sozinho, e o painel recusa esse prefixo.
+  if (req.method === "GET") {
+    const faltando = [
+      ["VAPID_PUBLICA", PUBLICA],
+      ["VAPID_PRIVADA", PRIVADA],
+      ["NOTIFICAR_SEGREDO", SEGREDO],
+      ["SUPABASE_URL (automático)", SUPA_URL],
+      ["SUPABASE_SERVICE_ROLE_KEY (automático)", SUPA_KEY],
+    ].filter(([, v]) => !v).map(([n]) => n);
+
+    return Response.json({
+      funcao: "notificar",
+      pronta: faltando.length === 0,
+      faltando,
+      assunto: ASSUNTO,
+      instrucao: faltando.length === 0
+        ? "Tudo no lugar. Agora rode o teste pelo SQL Editor."
+        : "Cadastre os itens acima em Edge Functions → Secrets.",
+    });
+  }
+
   if (req.method !== "POST") return new Response("use POST", { status: 405 });
 
   if (!SEGREDO || req.headers.get("x-notificar-segredo") !== SEGREDO) {
