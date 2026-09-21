@@ -66,8 +66,17 @@ create policy "dono apaga assinaturas" on public.push_assinaturas
 --  na notificação nunca trava nem desfaz a gravação do pedido.
 --  Pedido tem que entrar mesmo que o aviso falhe.
 -- ------------------------------------------------------------
-create or replace function public.avisa_celular()
-returns trigger
+--  O endereço e o segredo ficam SÓ aqui. Os gatilhos abaixo chamam
+--  esta função, então mudar de projeto ou trocar o segredo é mexer
+--  em um lugar, não em três.
+create or replace function public.envia_aviso(
+  p_usuario uuid,
+  p_titulo  text,
+  p_corpo   text,
+  p_url     text default '/',
+  p_marca   text default 'precifica'
+)
+returns void
 language plpgsql
 security definer
 set search_path = public
@@ -75,6 +84,30 @@ as $$
 declare
   destino text := 'https://SEU-PROJETO.supabase.co/functions/v1/notificar';  -- <<< TROQUE pelo seu projeto
   segredo text := 'COLE-AQUI-O-MESMO-SEGREDO-DA-FUNCAO';                     -- <<< TROQUE (o mesmo de NOTIFICAR_SEGREDO)
+begin
+  perform net.http_post(
+    url     := destino,
+    headers := jsonb_build_object(
+                 'Content-Type',        'application/json',
+                 'x-notificar-segredo', segredo
+               ),
+    body    := jsonb_build_object(
+                 'usuario', p_usuario,
+                 'titulo',  p_titulo,
+                 'corpo',   p_corpo,
+                 'url',     p_url,
+                 'marca',   p_marca
+               )
+  );
+end $$;
+
+create or replace function public.avisa_celular()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
   titulo  text;
   corpo   text;
   nome    text;
@@ -99,21 +132,7 @@ begin
     return new;   -- qualquer outra alteração não vira aviso
   end if;
 
-  perform net.http_post(
-    url     := destino,
-    headers := jsonb_build_object(
-                 'Content-Type',       'application/json',
-                 'x-notificar-segredo', segredo
-               ),
-    body    := jsonb_build_object(
-                 'usuario', new.usuario,
-                 'titulo',  titulo,
-                 'corpo',   corpo,
-                 'url',     '/?aba=gestao',
-                 'marca',   'pedido-' || new.id
-               )
-  );
-
+  perform public.envia_aviso(new.usuario, titulo, corpo, '/?aba=gestao', 'pedido-' || new.id);
   return new;
 end $$;
 
@@ -121,6 +140,84 @@ drop trigger if exists pedidos_loja_avisa on public.pedidos_loja;
 create trigger pedidos_loja_avisa
   after insert or update of status on public.pedidos_loja
   for each row execute function public.avisa_celular();
+
+-- ------------------------------------------------------------
+--  2b · Pedido personalizado (orçamento)
+--
+--  Quem pede peça sob encomenda não passa pelo carrinho: preenche o
+--  formulário de orçamento. Sem este gatilho, só se descobria o
+--  pedido abrindo o sistema — que é justamente o que queremos evitar.
+-- ------------------------------------------------------------
+create or replace function public.avisa_orcamento()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  resumo text;
+begin
+  -- O começo da descrição já diz do que se trata; o resto fica no sistema.
+  resumo := coalesce(nullif(trim(new.descricao), ''), 'sem descrição');
+  if length(resumo) > 90 then
+    resumo := left(resumo, 87) || '...';
+  end if;
+
+  perform public.envia_aviso(
+    new.usuario,
+    'Pedido personalizado',
+    new.nome || ' · ' || new.quantidade || ' un · ' || resumo,
+    '/?aba=gestao',
+    'orcamento-' || new.id
+  );
+  return new;
+end $$;
+
+drop trigger if exists orcamentos_loja_avisa on public.orcamentos_loja;
+create trigger orcamentos_loja_avisa
+  after insert on public.orcamentos_loja
+  for each row execute function public.avisa_orcamento();
+
+-- ------------------------------------------------------------
+--  2c · Mensagem de contato
+--
+--  Só as mensagens de verdade. Cadastro de novidades entra na mesma
+--  tabela com tipo 'novidades', e avisar a cada inscrição de
+--  newsletter transformaria a notificação em barulho — quando tudo
+--  apita, nada apita.
+-- ------------------------------------------------------------
+create or replace function public.avisa_mensagem()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  resumo text;
+begin
+  if new.tipo <> 'contato' then
+    return new;
+  end if;
+
+  resumo := coalesce(nullif(trim(new.assunto), ''), nullif(trim(new.mensagem), ''), 'sem assunto');
+  if length(resumo) > 90 then
+    resumo := left(resumo, 87) || '...';
+  end if;
+
+  perform public.envia_aviso(
+    new.usuario,
+    'Mensagem no site',
+    coalesce(nullif(new.nome, ''), 'Alguém') || ' · ' || resumo,
+    '/?aba=gestao',
+    'mensagem-' || new.id
+  );
+  return new;
+end $$;
+
+drop trigger if exists mensagens_loja_avisa on public.mensagens_loja;
+create trigger mensagens_loja_avisa
+  after insert on public.mensagens_loja
+  for each row execute function public.avisa_mensagem();
 
 -- ------------------------------------------------------------
 --  3 · Teste manual

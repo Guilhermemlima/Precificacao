@@ -2452,7 +2452,11 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
      com apenas o que a vitrine mostra. É essa coleção — e só ela — que a
      regra do supabase-loja.sql libera para quem não tem login. */
 
-  var PRAZO_PADRAO = 5;
+  /* Prazo de produção padrão de cada peça, em dias. Serve como estimativa
+     interna e é o que a loja publica quando o produto não tem prazo
+     próprio. Dez, e não cinco: prazo curto demais vira promessa quebrada,
+     e é melhor entregar antes do combinado do que depois. */
+  var PRAZO_PADRAO = 10;
 
   /* Quantas fotos uma peça pode ter na loja, contando a principal.
      Cinco cobre frente, costas, base, detalhe e a peça na mão — mais que
