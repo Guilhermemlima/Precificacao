@@ -230,15 +230,13 @@ create trigger mensagens_loja_avisa
 --  roda como postgres, não como usuário logado, então auth.uid()
 --  viria nulo e a função recusaria a chamada.
 -- ------------------------------------------------------------
--- select net.http_post(
---   url     := 'https://SEU-PROJETO.supabase.co/functions/v1/notificar',
---   headers := jsonb_build_object('Content-Type','application/json',
---                                 'x-notificar-segredo','O-SEGREDO'),
---   body    := jsonb_build_object(
---                'usuario', (select usuario from public.push_assinaturas
---                             order by criado_em desc limit 1),
---                'titulo',  'Teste do Precifica',
---                'corpo',   'Se você está lendo isto, as notificações funcionam.')
+--  Usa a mesma função dos gatilhos, então testa o endereço e o segredo
+--  de verdade — e não uma cópia deles escrita aqui, que poderia estar
+--  certa enquanto a de lá está errada.
+-- select public.envia_aviso(
+--   (select usuario from public.push_assinaturas order by criado_em desc limit 1),
+--   'Teste do Precifica',
+--   'Se você está lendo isto, as notificações funcionam.'
 -- );
 --
 -- Uns 5 segundos depois, veja o que a função respondeu:
