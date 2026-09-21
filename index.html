@@ -7528,6 +7528,15 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     return bytes;
   }
 
+  // Caminho inverso: os bytes que o navegador guardou viram base64url, para
+  // poder comparar com a chave que o site usa hoje.
+  function bytesEmChave(buffer){
+    if(!buffer) return '';
+    var b = new Uint8Array(buffer), s = '';
+    for(var i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+    return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  }
+
   function pushSuportado(){
     // isSecureContext, e não "https:": localhost também é seguro, e é
     // por ele que se testa antes de publicar.
@@ -7568,15 +7577,27 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       }
       return navigator.serviceWorker.ready;
     }).then(function(reg){
-      return reg.pushManager.getSubscription().then(function(ja){
-        // Uma inscrição antiga pode ter sido feita com outra chave; nesse
-        // caso o servidor não consegue mais falar com ela e é preciso
-        // refazer, senão o aviso some sem erro nenhum.
-        if(ja) return ja;
+      function assinar(){
         return reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: chaveEmBytes(VAPID_PUBLICA)
         });
+      }
+      return reg.pushManager.getSubscription().then(function(ja){
+        if(!ja) return assinar();
+
+        // A inscrição fica amarrada à chave usada ao criá-la. Se a chave do
+        // servidor mudou, o serviço de push recusa com 403 e o aviso some
+        // sem erro visível — então aqui a inscrição velha é refeita.
+        if(bytesEmChave(ja.options && ja.options.applicationServerKey) === VAPID_PUBLICA) return ja;
+
+        var antigo = ja.endpoint;
+        return ja.unsubscribe()
+          .then(function(){
+            return api('/rest/v1/push_assinaturas?endpoint=eq.' + encodeURIComponent(antigo),
+                       {method:'DELETE'}, true).catch(function(){});
+          })
+          .then(assinar);
       });
     }).then(function(sub){
       var j = sub.toJSON();
@@ -7620,9 +7641,16 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     assinaturaAtual().then(function(sub){
       var linhas = [];
       var permissao = Notification.permission;
+      // Inscrição feita com uma chave que não é mais a do servidor: existe,
+      // mas o serviço de push recusa. Precisa ser refeita, e para isso o
+      // botão de ativar tem que continuar à mão.
+      var vencida = !!sub && bytesEmChave(sub.options && sub.options.applicationServerKey) !== VAPID_PUBLICA;
 
       if(permissao === 'denied'){
         linhas.push('<div class="l"><span class="er">✗</span> Notificações bloqueadas para este site. Libere no cadeado ao lado do endereço.</div>');
+      } else if(vencida){
+        linhas.push('<div class="l"><span class="er">✗</span> A inscrição deste aparelho está desatualizada e os avisos não chegam.</div>');
+        linhas.push('<div class="l">Toque em <b>Renovar neste aparelho</b> para corrigir.</div>');
       } else if(sub){
         linhas.push('<div class="l"><span class="ok">✓</span> Este aparelho receberá avisos.</div>');
         linhas.push('<div class="l" style="color:var(--muted)">' + escapa(apelidoDoAparelho()) + '</div>');
@@ -7634,9 +7662,10 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       }
 
       el.innerHTML = linhas.join('');
-      ligar.hidden    = !!sub || permissao === 'denied';
+      ligar.hidden    = (!!sub && !vencida) || permissao === 'denied';
+      ligar.textContent = vencida ? 'Renovar neste aparelho' : 'Ativar neste aparelho';
       desligar.hidden = !sub;
-      testar.hidden   = !sub;
+      testar.hidden   = !sub || vencida;
     });
   }
 
