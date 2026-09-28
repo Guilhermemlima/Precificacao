@@ -453,6 +453,14 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 .tudo-certo .t{font-family:var(--font-display); font-size:19px; letter-spacing:.03em; color:var(--good)}
 .tudo-certo .s{font-size:13px; color:var(--muted); margin-top:5px}
 
+/* ---------- parcerias: lista de segmentos ---------- */
+#sugestoesSegmento{display:flex; flex-direction:column; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:9px; overflow:hidden}
+.seg-l{display:flex; align-items:center; gap:10px; padding:9px 12px; background:var(--surface); flex-wrap:wrap}
+.seg-t{flex:1; min-width:190px; display:flex; flex-direction:column; gap:1px}
+.seg-t b{font-size:13.5px}
+.seg-t .sub{font-size:11.5px}
+.seg-l a.btn{text-decoration:none}
+
 /* ---------- editor de catálogo ---------- */
 .cat{background:var(--surface); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); margin-bottom:14px}
 .cat-hd{display:flex; align-items:flex-start; gap:12px; padding:13px 15px; border-bottom:1px solid var(--line); flex-wrap:wrap}
@@ -1299,10 +1307,16 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   <div id="listaParcerias"></div>
 
   <section class="card" style="margin-top:16px">
-    <header><h2>Onde procurar por aqui</h2><span class="hint">ideias de segmento</span></header>
+    <header><h2>Onde procurar</h2><span class="hint">abre o Maps já filtrado</span></header>
     <div class="body">
-      <p class="dlg-s" style="margin:0">Toque para criar uma parceria já com o segmento preenchido. A lista é um lembrete de tipos de comércio que costumam comprar peça impressa — não é uma busca de lojas reais.</p>
-      <div id="sugestoesSegmento" style="display:flex; gap:8px; flex-wrap:wrap"></div>
+      <div class="mes-bar" style="margin:0">
+        <label class="mes-lab" for="cidadeBusca">Procurar em</label>
+        <div class="inp" style="max-width:260px">
+          <input class="txt" type="text" id="cidadeBusca" placeholder="Guarapuava PR">
+        </div>
+      </div>
+      <p class="dlg-s" style="margin:0"><b>Ver no Maps</b> abre a busca daquele tipo de comércio na cidade escolhida — no celular, direto no aplicativo. <b>+ Parceria</b> cria a ficha já com o segmento preenchido, para você anotar enquanto conversa.</p>
+      <div id="sugestoesSegmento"></div>
     </div>
   </section>
 
@@ -6696,15 +6710,41 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     descartado: 'Descartado'
   };
 
-  // Tipos de comércio que costumam vender peça impressa. É lembrete de
-  // onde bater, não busca de lojas: a página não consulta a internet.
+  /* Tipos de comércio que costumam vender peça impressa, com o termo que
+     o Google Maps entende melhor. A página não consulta a internet, mas
+     pode abrir o Maps já filtrado — quem procura é ele, com o mapa e os
+     telefones que você precisa para bater na porta. */
   var SEGMENTOS = [
-    'Loja de games', 'Quadrinhos e colecionáveis', 'Presentes e variedades',
-    'Papelaria', 'Pet shop', 'Decoração e casa', 'Floricultura',
-    'Barbearia', 'Loja de celular e acessórios', 'Cafeteria',
-    'Bar temático', 'Estúdio de tatuagem', 'Loja de bicicletas',
-    'Óticas', 'Lojas de festa'
+    {nome:'Loja de games',          busca:'loja de videogames',          ideia:'suportes de controle, chaveiros de jogos, luminárias'},
+    {nome:'Informática',            busca:'loja de informática',         ideia:'organizadores de cabo, suportes de headset e celular'},
+    {nome:'Quadrinhos e action figures', busca:'loja de quadrinhos',     ideia:'bases de exposição, bustos, suportes de HQ'},
+    {nome:'Panificadora',           busca:'padaria',                     ideia:'topos de bolo, cortadores, chaveiros de brinde'},
+    {nome:'Restaurante temático',   busca:'restaurante temático',        ideia:'peças de decoração, porta-guardanapo, brindes'},
+    {nome:'Presentes e variedades', busca:'loja de presentes',           ideia:'lembrancinhas, itens personalizados com nome'},
+    {nome:'Papelaria',              busca:'papelaria',                   ideia:'marcadores, porta-canetas, apoios de celular'},
+    {nome:'Pet shop',               busca:'pet shop',                    ideia:'plaquinhas de coleira, comedouros, porta-petiscos'},
+    {nome:'Decoração e casa',       busca:'loja de decoração',           ideia:'vasos, cachepôs, apliques de parede'},
+    {nome:'Floricultura',           busca:'floricultura',                ideia:'vasos, suportes, plaquinhas para arranjos'},
+    {nome:'Barbearia',              busca:'barbearia',                   ideia:'porta-navalha, placas, itens de vitrine'},
+    {nome:'Celulares e acessórios', busca:'loja de celulares',           ideia:'suportes de mesa, apoios veiculares'},
+    {nome:'Cafeteria',              busca:'cafeteria',                   ideia:'porta-coador, plaquinhas de mesa, enfeites'},
+    {nome:'Bar temático',           busca:'bar',                         ideia:'abridores, porta-copos, decoração de parede'},
+    {nome:'Estúdio de tatuagem',    busca:'estúdio de tatuagem',         ideia:'apoios de braço, organizadores, peças de vitrine'},
+    {nome:'Loja de bicicletas',     busca:'loja de bicicletas',          ideia:'suportes, adaptadores, peças de reposição'},
+    {nome:'Ótica',                  busca:'ótica',                       ideia:'expositores de óculos, plaquinhas'},
+    {nome:'Artigos para festa',     busca:'loja de artigos para festa',  ideia:'topos de bolo, lembrancinhas, moldes'},
+    {nome:'Loja de brinquedos',     busca:'loja de brinquedos',          ideia:'miniaturas, quebra-cabeças, peças articuladas'},
+    {nome:'Imobiliária',            busca:'imobiliária',                 ideia:'chaveiros personalizados, maquetes, brindes'}
   ];
+
+  function cidadeBusca(){ return load('p3d.cidadeBusca') || 'Guarapuava PR'; }
+  function setCidadeBusca(c){ store('p3d.cidadeBusca', c); }
+
+  // Formato oficial de busca do Maps: funciona no navegador e, no celular,
+  // abre direto no aplicativo.
+  function linkMaps(termo){
+    return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(termo);
+  }
 
   function parcerias(){ try{ return JSON.parse(load('p3d.parcerias')||'[]'); }catch(e){ return []; } }
   function setParcerias(a, redesenha){
@@ -6776,8 +6816,14 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       return '<div class="tile"><div class="k">'+t.k+'</div><div class="v '+t.cls+'">'+t.v+'</div><div class="n">'+t.n+'</div></div>';
     }).join('');
 
+    var cidade = cidadeBusca();
+    if($('cidadeBusca') && document.activeElement !== $('cidadeBusca')) $('cidadeBusca').value = cidade;
     $('sugestoesSegmento').innerHTML = SEGMENTOS.map(function(s){
-      return '<button class="btn tiny" type="button" data-seg="'+escapa(s)+'">'+escapa(s)+'</button>';
+      return '<div class="seg-l">' +
+        '<div class="seg-t"><b>'+escapa(s.nome)+'</b><span class="sub">'+escapa(s.ideia)+'</span></div>' +
+        '<a class="btn tiny" target="_blank" rel="noopener" href="'+escapa(linkMaps(s.busca + ' ' + cidade))+'">Ver no Maps</a>' +
+        '<button class="btn tiny ghost" type="button" data-seg="'+escapa(s.nome)+'">+ Parceria</button>' +
+      '</div>';
     }).join('');
 
     var visiveis = lista.filter(function(p){ return !filtro || p.estagio === filtro; });
@@ -6833,6 +6879,8 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
               '</select>' +
               '<input class="cel" type="text" data-i="'+i+'" data-f="segmento" value="'+escapa(p.segmento||'')+'" placeholder="Segmento" style="max-width:150px">' +
               '<input class="cel" type="text" data-i="'+i+'" data-f="cidade" value="'+escapa(p.cidade||'')+'" placeholder="Cidade" style="max-width:120px">' +
+              '<a class="btn tiny ghost" data-maps="'+i+'" target="_blank" rel="noopener" href="'+
+                escapa(linkMaps(((p.nome||'') + ' ' + (p.cidade || cidadeBusca())).trim()))+'">Maps</a>' +
               '<button class="btn tiny" data-additem="'+i+'" type="button">+ Item</button>' +
               '<button class="btn tiny ghost" data-rmparceiro="'+i+'" type="button">Excluir</button>' +
             '</div>' +
@@ -6886,6 +6934,12 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       }
     } else {
       p[el.dataset.f] = el.value;
+      // O link do Maps acompanha a digitação. Sem isto ele só passaria a
+      // apontar para a loja certa na próxima vez que a tela se refizesse.
+      if(el.dataset.f === 'nome' || el.dataset.f === 'cidade'){
+        var link = $('listaParcerias').querySelector('[data-maps="' + i + '"]');
+        if(link) link.href = linkMaps(((p.nome||'') + ' ' + (p.cidade || cidadeBusca())).trim());
+      }
     }
     setParcerias(a, false);
   });
@@ -6951,6 +7005,16 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   });
 
   $('filtroEstagio').addEventListener('change', renderParcerias);
+
+  // A cidade muda os links de todos os segmentos, entao redesenha; mas so
+  // depois de uma pausa, para nao refazer a lista a cada letra digitada.
+  var poucoDepois = null;
+  $('cidadeBusca').addEventListener('input', function(){
+    setCidadeBusca(this.value.trim());
+    marca('parceria', 'doc');
+    clearTimeout(poucoDepois);
+    poucoDepois = setTimeout(renderParcerias, 600);
+  });
 
   /* ---------- avisos ----------
      Tudo é derivado de pedidos e estoque; nada fica gravado como "aviso".
@@ -7472,7 +7536,8 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     motivo:   { ler: function(){ return {lista: motivos()}; },   gravar: function(v){ setMotivos(v.lista||[]); } },
     // O combinado com as lojas precisa estar no celular na hora da visita,
     // e no computador na hora de produzir.
-    parceria: { ler: function(){ return {lista: parcerias()}; }, gravar: function(v){ setParcerias(v.lista||[]); } }
+    parceria: { ler: function(){ return {lista: parcerias(), cidade: cidadeBusca()}; },
+                gravar: function(v){ if(v.cidade) setCidadeBusca(v.cidade); setParcerias(v.lista||[]); } }
   };
   // Enquanto aplicamos o que veio de fora, os salvamentos não podem
   // carimbar nada — senão o dado volta a subir e vira eco sem fim.
