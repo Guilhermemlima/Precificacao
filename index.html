@@ -647,6 +647,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     <button class="tab" id="tabGestao" type="button">Pedidos e painel</button>
     <button class="tab" id="tabOrcamentos" type="button">Orçamentos<span id="orcamentosN"></span></button>
     <button class="tab" id="tabClientes" type="button">Clientes<span id="clientesN"></span></button>
+    <button class="tab" id="tabParcerias" type="button">Parcerias<span id="parceriasN"></span></button>
     <button class="tab" id="tabCatalogo" type="button">Catálogo</button>
     <button class="tab" id="tabEstoque" type="button">Estoque e cores</button>
     <span class="tab-badge" id="tabBadge"></span>
@@ -1273,6 +1274,40 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 </div>
 
 <!-- ============ CLIENTES ============ -->
+<div id="viewParcerias" hidden>
+
+  <div class="tiles" id="tilesParcerias"></div>
+
+  <div class="mes-bar">
+    <button class="btn primary" type="button" id="btnNovoParceiro">Nova parceria</button>
+    <select id="filtroEstagio" style="width:auto">
+      <option value="">Todos os estágios</option>
+      <option value="prospecto">Prospecto</option>
+      <option value="contatado">Contatado</option>
+      <option value="negociando">Negociando</option>
+      <option value="ativo">Ativo</option>
+      <option value="pausado">Pausado</option>
+      <option value="descartado">Descartado</option>
+    </select>
+    <span class="tab-badge" id="parceriasResumo" style="margin-left:0"></span>
+  </div>
+
+  <p class="note" style="margin-bottom:16px">
+    Cada parceria guarda o que a loja quer, o que você oferece e os itens combinados. Item com <b>a cada quantos dias</b> preenchido entra sozinho nos <b>Avisos</b> quando a data se aproxima — é o que impede uma entrega recorrente de ser esquecida.
+  </p>
+
+  <div id="listaParcerias"></div>
+
+  <section class="card" style="margin-top:16px">
+    <header><h2>Onde procurar por aqui</h2><span class="hint">ideias de segmento</span></header>
+    <div class="body">
+      <p class="dlg-s" style="margin:0">Toque para criar uma parceria já com o segmento preenchido. A lista é um lembrete de tipos de comércio que costumam comprar peça impressa — não é uma busca de lojas reais.</p>
+      <div id="sugestoesSegmento" style="display:flex; gap:8px; flex-wrap:wrap"></div>
+    </div>
+  </section>
+
+</div>
+
 <div id="viewClientes" hidden>
 
   <div class="tiles" id="tilesClientes"></div>
@@ -6646,6 +6681,277 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   $('nCores').addEventListener('change', analisaFoto);
   $('ignoraFundo').addEventListener('change', analisaFoto);
 
+  /* ---------- parcerias ----------
+     Uma loja que revende suas peças é outra coisa que um cliente final:
+     o valor é negociado, a compra se repete e o combinado precisa ficar
+     escrito. Aqui mora esse acordo, e é ele que alimenta os avisos de
+     entrega recorrente. */
+
+  var ESTAGIOS = {
+    prospecto:  'Prospecto',
+    contatado:  'Contatado',
+    negociando: 'Negociando',
+    ativo:      'Ativo',
+    pausado:    'Pausado',
+    descartado: 'Descartado'
+  };
+
+  // Tipos de comércio que costumam vender peça impressa. É lembrete de
+  // onde bater, não busca de lojas: a página não consulta a internet.
+  var SEGMENTOS = [
+    'Loja de games', 'Quadrinhos e colecionáveis', 'Presentes e variedades',
+    'Papelaria', 'Pet shop', 'Decoração e casa', 'Floricultura',
+    'Barbearia', 'Loja de celular e acessórios', 'Cafeteria',
+    'Bar temático', 'Estúdio de tatuagem', 'Loja de bicicletas',
+    'Óticas', 'Lojas de festa'
+  ];
+
+  function parcerias(){ try{ return JSON.parse(load('p3d.parcerias')||'[]'); }catch(e){ return []; } }
+  function setParcerias(a, redesenha){
+    store('p3d.parcerias', JSON.stringify(a));
+    if(redesenha !== false) renderParcerias();
+    renderAvisos();
+  }
+
+  function parceiroVazio(segmento){
+    return {
+      id: novoId('pc'), nome: '', segmento: segmento || '', cidade: 'Guarapuava',
+      estagio: 'prospecto', pessoa: '', telefone: '', instagram: '',
+      querem: '', ofereco: '', potencial: 3, obs: '', itens: []
+    };
+  }
+  function itemVazio(){
+    return { id: novoId('it'), peca: '', qtd: '10', preco: '', custo: '', dias: '30', proxima: '' };
+  }
+
+  // Quanto a parceria rende por mês, considerando a frequência de cada item.
+  // Um combinado de 10 peças a cada 15 dias vale o dobro do mesmo a cada 30.
+  function mensalDoItem(it){
+    var qtd = parseNum(it.qtd), preco = parseNum(it.preco), dias = parseNum(it.dias);
+    if(!qtd || !preco) return 0;
+    if(!dias) return 0;                       // sem recorrência não é receita previsível
+    return (qtd * preco) * (30 / dias);
+  }
+  function mensalDoParceiro(p){
+    return (p.itens||[]).reduce(function(s, it){ return s + mensalDoItem(it); }, 0);
+  }
+  // A margem do combinado: preço fechado com a loja contra o seu custo.
+  // É o número que diz se a parceria vale a pena ou se você está só
+  // ocupando a impressora.
+  function margemDoItem(it){
+    var preco = parseNum(it.preco), custo = parseNum(it.custo);
+    if(!preco || !custo) return null;
+    return (preco - custo) / preco;
+  }
+
+  function renderParcerias(){
+    var lista = parcerias();
+    var filtro = $('filtroEstagio') ? $('filtroEstagio').value : '';
+    var ativos = lista.filter(function(p){ return p.estagio === 'ativo'; });
+    var mensal = ativos.reduce(function(s, p){ return s + mensalDoParceiro(p); }, 0);
+
+    // Próxima entrega combinada, entre todos os parceiros ativos.
+    var proximas = [];
+    ativos.forEach(function(p){
+      (p.itens||[]).forEach(function(it){
+        if(it.proxima) proximas.push({data: it.proxima, loja: p.nome, item: it});
+      });
+    });
+    proximas.sort(function(a,b){ return a.data.localeCompare(b.data); });
+    var prox = proximas[0];
+    var aContatar = lista.filter(function(p){ return p.estagio === 'prospecto' || p.estagio === 'contatado'; }).length;
+
+    $('parceriasResumo').textContent = lista.length
+      ? lista.length + ' parceria(s) · ' + ativos.length + ' ativa(s)' : '';
+    var badge = $('parceriasN');
+    if(badge){ badge.textContent = ativos.length || ''; badge.classList.toggle('on', ativos.length > 0); }
+
+    $('tilesParcerias').innerHTML = [
+      {k:'Parcerias ativas', v:String(ativos.length), cls:'accent', n:lista.length + ' cadastrada(s) no total'},
+      {k:'Receita recorrente', v:money(mensal), cls:(mensal>0?'good':''), n:'por mês, pelo que está combinado'},
+      {k:'Próxima entrega', v:(prox ? brData(prox.data) : '—'), cls:'',
+       n:(prox ? escapa(prox.loja) + ' · ' + escapa(prox.item.peca || 'item') : 'nenhuma agendada')},
+      {k:'A contatar', v:String(aContatar), cls:'', n:'prospectos e contatos sem resposta'}
+    ].map(function(t){
+      return '<div class="tile"><div class="k">'+t.k+'</div><div class="v '+t.cls+'">'+t.v+'</div><div class="n">'+t.n+'</div></div>';
+    }).join('');
+
+    $('sugestoesSegmento').innerHTML = SEGMENTOS.map(function(s){
+      return '<button class="btn tiny" type="button" data-seg="'+escapa(s)+'">'+escapa(s)+'</button>';
+    }).join('');
+
+    var visiveis = lista.filter(function(p){ return !filtro || p.estagio === filtro; });
+    if(!visiveis.length){
+      $('listaParcerias').innerHTML = '<div class="card"><div class="body"><p class="empty">' +
+        (lista.length ? 'Nenhuma parceria neste estágio.'
+                      : 'Nenhuma parceria ainda. Use “Nova parceria”, ou toque num segmento lá embaixo para começar.') +
+        '</p></div></div>';
+      return;
+    }
+
+    var salvas = lib();
+    $('listaParcerias').innerHTML = visiveis.map(function(p){
+      var i = lista.indexOf(p);
+      var itens = (p.itens||[]).map(function(it, k){
+        var m = margemDoItem(it);
+        var mes = mensalDoItem(it);
+        var corMargem = m === null ? 'var(--muted)' : m < 0 ? 'var(--bad)' : m < 0.25 ? 'var(--warn)' : 'var(--good)';
+        return '<div class="prod-ed" style="align-items:flex-start">' +
+          '<div class="prod-campos">' +
+            '<div class="linha-topo">' +
+              '<input type="text" list="pecasSalvas" data-i="'+i+'" data-k="'+k+'" data-f="peca" value="'+escapa(it.peca||'')+'" placeholder="Peça (ex.: Suporte de controle Xbox)" style="flex:2;min-width:170px">' +
+              '<button class="btn tiny ghost" data-rmitem="'+i+'.'+k+'" type="button">×</button>' +
+            '</div>' +
+            '<div class="linha-topo">' +
+              '<label class="sub">Qtd <input type="text" inputmode="decimal" data-i="'+i+'" data-k="'+k+'" data-f="qtd" value="'+escapa(it.qtd||'')+'" style="width:58px"></label>' +
+              '<label class="sub">Preço combinado <input type="text" inputmode="decimal" data-i="'+i+'" data-k="'+k+'" data-f="preco" value="'+escapa(it.preco||'')+'" style="width:82px"></label>' +
+              '<label class="sub">Seu custo <input type="text" inputmode="decimal" data-i="'+i+'" data-k="'+k+'" data-f="custo" value="'+escapa(it.custo||'')+'" style="width:82px"></label>' +
+              '<label class="sub">A cada <input type="text" inputmode="decimal" data-i="'+i+'" data-k="'+k+'" data-f="dias" value="'+escapa(it.dias||'')+'" style="width:52px"> dias</label>' +
+              '<label class="sub">Próxima <input type="date" class="dt" data-i="'+i+'" data-k="'+k+'" data-f="proxima" value="'+escapa(it.proxima||'')+'"></label>' +
+            '</div>' +
+            '<div class="linha-topo">' +
+              '<span class="sub" style="color:'+corMargem+'">' +
+                (m === null ? 'Preencha preço e custo para ver a margem'
+                            : 'Margem ' + num(m*100,0) + '% · ' + money(parseNum(it.preco) - parseNum(it.custo)) + ' por peça') +
+              '</span>' +
+              (mes > 0 ? '<span class="sub">' + money(mes) + '/mês</span>' : '') +
+              (it.proxima ? '<button class="btn tiny" data-entregue="'+i+'.'+k+'" type="button">Entreguei — adiar</button>' : '') +
+            '</div>' +
+          '</div></div>';
+      }).join('');
+
+      return '<div class="cat">' +
+        '<div class="cat-hd">' +
+          '<div class="cat-meta">' +
+            '<div class="l1">' +
+              '<input class="cat-nome" type="text" data-i="'+i+'" data-f="nome" value="'+escapa(p.nome||'')+'" placeholder="Nome da loja">' +
+            '</div>' +
+            '<div class="cat-acts">' +
+              '<select class="st" data-i="'+i+'" data-f="estagio">' +
+                Object.keys(ESTAGIOS).map(function(e){
+                  return '<option value="'+e+'"'+(p.estagio===e?' selected':'')+'>'+ESTAGIOS[e]+'</option>'; }).join('') +
+              '</select>' +
+              '<input class="cel" type="text" data-i="'+i+'" data-f="segmento" value="'+escapa(p.segmento||'')+'" placeholder="Segmento" style="max-width:150px">' +
+              '<input class="cel" type="text" data-i="'+i+'" data-f="cidade" value="'+escapa(p.cidade||'')+'" placeholder="Cidade" style="max-width:120px">' +
+              '<button class="btn tiny" data-additem="'+i+'" type="button">+ Item</button>' +
+              '<button class="btn tiny ghost" data-rmparceiro="'+i+'" type="button">Excluir</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="cat-body">' +
+          '<div class="row">' +
+            '<div class="f"><label>Contato</label>' +
+              '<input class="cel" type="text" data-i="'+i+'" data-f="pessoa" value="'+escapa(p.pessoa||'')+'" placeholder="Com quem você fala"></div>' +
+            '<div class="f"><label>WhatsApp</label>' +
+              '<input class="cel" type="text" data-i="'+i+'" data-f="telefone" value="'+escapa(p.telefone||'')+'" placeholder="(00) 00000-0000"></div>' +
+            '<div class="f"><label>Instagram</label>' +
+              '<input class="cel" type="text" data-i="'+i+'" data-f="instagram" value="'+escapa(p.instagram||'')+'" placeholder="@loja"></div>' +
+          '</div>' +
+          '<div class="row">' +
+            '<div class="f"><label>O que a loja quer</label>' +
+              '<textarea rows="2" data-i="'+i+'" data-f="querem" placeholder="Ex.: chaveiros de jogos e suportes de controle, reposição mensal">'+escapa(p.querem||'')+'</textarea></div>' +
+            '<div class="f"><label>O que você oferece</label>' +
+              '<textarea rows="2" data-i="'+i+'" data-f="ofereco" placeholder="Ex.: 20% abaixo do varejo acima de 10 peças, exclusividade na cidade">'+escapa(p.ofereco||'')+'</textarea></div>' +
+          '</div>' +
+          '<div class="f"><label>Observações</label>' +
+            '<textarea rows="2" data-i="'+i+'" data-f="obs" placeholder="Condições de pagamento, consignado, prazos, o que ficou pendente…">'+escapa(p.obs||'')+'</textarea></div>' +
+          '<div class="mini-label">Itens combinados</div>' +
+          (itens || '<p class="empty">Nenhum item. Use “+ Item” para registrar o que foi acertado.</p>') +
+          (mensalDoParceiro(p) > 0
+            ? '<div class="resumo-an">Esta parceria vale <b>' + money(mensalDoParceiro(p)) + ' por mês</b> pelo que está combinado.</div>'
+            : '') +
+        '</div>' +
+      '</div>';
+    }).join('') +
+    '<datalist id="pecasSalvas">' + salvas.map(function(s){
+      return '<option value="'+escapa(s.nome)+'">'; }).join('') + '</datalist>';
+  }
+
+  // Texto e números salvam sem redesenhar: refazer a lista a cada tecla
+  // tiraria o foco do campo no meio da digitação.
+  $('listaParcerias').addEventListener('input', function(e){
+    var el = e.target, i = el.dataset.i;
+    if(i === undefined) return;
+    var a = parcerias(), p = a[i];
+    if(!p) return;
+    if(el.dataset.k !== undefined){
+      var it = (p.itens||[])[el.dataset.k];
+      if(!it) return;
+      it[el.dataset.f] = el.value;
+      // Peça salva na biblioteca já sabe quanto custa: aproveita o número
+      // em vez de deixar você procurar.
+      if(el.dataset.f === 'peca' && !parseNum(it.custo)){
+        var achada = lib().find(function(s){ return s.nome.toLowerCase() === el.value.trim().toLowerCase(); });
+        if(achada) it.custo = num(achada.custo, 2);
+      }
+    } else {
+      p[el.dataset.f] = el.value;
+    }
+    setParcerias(a, false);
+  });
+
+  $('listaParcerias').addEventListener('change', function(e){
+    var el = e.target;
+    if(el.dataset.i === undefined) return;
+    if(el.tagName === 'SELECT' || el.type === 'date'){
+      var a = parcerias(), p = a[el.dataset.i];
+      if(!p) return;
+      if(el.dataset.k !== undefined) p.itens[el.dataset.k][el.dataset.f] = el.value;
+      else p[el.dataset.f] = el.value;
+      setParcerias(a);
+    }
+  });
+
+  $('listaParcerias').addEventListener('click', function(e){
+    var b = e.target.closest('[data-additem],[data-rmitem],[data-rmparceiro],[data-entregue]');
+    if(!b) return;
+    var a = parcerias(), d = b.dataset, ix;
+
+    if(d.additem !== undefined){
+      a[d.additem].itens = a[d.additem].itens || [];
+      a[d.additem].itens.push(itemVazio());
+    }
+    if(d.rmitem !== undefined){
+      ix = d.rmitem.split('.');
+      a[ix[0]].itens.splice(ix[1], 1);
+    }
+    if(d.rmparceiro !== undefined) a.splice(d.rmparceiro, 1);
+    if(d.entregue !== undefined){
+      // Adia a partir da data combinada, não de hoje: entregar com um dia
+      // de atraso não empurra todo o calendário para frente.
+      ix = d.entregue.split('.');
+      var it = a[ix[0]].itens[ix[1]];
+      var passo = Math.max(1, parseNum(it.dias) || 30);
+      var base = it.proxima || hojeISO();
+      var nova = addDias(base, passo);
+      // Se a entrega estava muito atrasada, alcança o futuro em vez de
+      // agendar uma data que já passou.
+      while(diffDias(hojeISO(), nova) < 0) nova = addDias(nova, passo);
+      it.proxima = nova;
+    }
+    setParcerias(a);
+  });
+
+  $('btnNovoParceiro').addEventListener('click', function(){
+    var a = parcerias();
+    a.unshift(parceiroVazio());
+    setParcerias(a);
+    var campo = $('listaParcerias').querySelector('.cat-nome');
+    if(campo) campo.focus();
+  });
+
+  $('sugestoesSegmento').addEventListener('click', function(e){
+    var b = e.target.closest('[data-seg]');
+    if(!b) return;
+    var a = parcerias();
+    a.unshift(parceiroVazio(b.dataset.seg));
+    setParcerias(a);
+    var campo = $('listaParcerias').querySelector('.cat-nome');
+    if(campo){ campo.focus(); campo.scrollIntoView({block:'center', behavior:'smooth'}); }
+  });
+
+  $('filtroEstagio').addEventListener('change', renderParcerias);
+
   /* ---------- avisos ----------
      Tudo é derivado de pedidos e estoque; nada fica gravado como "aviso".
      Silenciar guarda só a data, e o aviso volta se continuar valendo. */
@@ -6664,6 +6970,30 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     var envio = Math.max(0, val('diasEnvio'));
     var antec = Math.max(0, val('diasAlerta'));
     var abertos = pedidos().filter(emAberto);
+
+    /* Entregas combinadas com lojas parceiras. Reposição é compromisso de
+       data que ninguém cobra: a loja só percebe a falta quando a prateleira
+       esvazia, e aí a parceria já esfriou. */
+    parcerias().filter(function(p){ return p.estagio === 'ativo'; }).forEach(function(p){
+      (p.itens||[]).forEach(function(it){
+        if(!it.proxima) return;
+        var faltam = diffDias(hoje, it.proxima);
+        if(faltam > antec) return;
+        var oque = (parseNum(it.qtd) || 0) + '× ' + (it.peca || 'item combinado');
+        var loja = p.nome || 'Parceria sem nome';
+        if(faltam < 0){
+          av.push({ch:'pcatr-'+it.id, nivel:'critico', ico:'atrasado',
+            tt:'Entrega atrasada para ' + escapa(loja),
+            dd:'<b>' + escapa(oque) + '</b> venceu em <b>' + brData(it.proxima) + '</b>, há ' + Math.abs(faltam) + ' dia(s).'});
+        } else {
+          av.push({ch:'pc-'+it.id, nivel: faltam <= 2 ? 'critico' : 'atencao',
+            ico: faltam + 'd',
+            tt: faltam === 0 ? 'Entrega de parceria é hoje' : 'Entrega de parceria em ' + faltam + ' dia(s)',
+            dd:'<b>' + escapa(oque) + '</b> para <b>' + escapa(loja) + '</b> em ' + brData(it.proxima) + '.' +
+               (parseNum(it.preco) ? ' Vale ' + money(parseNum(it.qtd) * parseNum(it.preco)) + '.' : '')});
+        }
+      });
+    });
 
     /* Pedidos da loja esperando pagamento. Sem isso a venda vinda do site
        ficava esperando alguém lembrar de olhar a aba Pedidos — e a reserva de
@@ -6799,7 +7129,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 
   /* ---------- abas ----------
      Lista única: quem adicionar aba nova mexe só aqui. */
-  var ABAS = ['calc','avisos','gestao','orcamentos','clientes','catalogo','estoque'];
+  var ABAS = ['calc','avisos','gestao','orcamentos','clientes','parcerias','catalogo','estoque'];
   function trocaAba(qual){
     if(ABAS.indexOf(qual) < 0) qual = 'calc';
     ABAS.forEach(function(v){
@@ -6823,6 +7153,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
       // que estava na tela na ultima vez.
       buscaClientes().then(renderClientes);
     }
+    if(qual === 'parcerias') renderParcerias();
     if(qual === 'catalogo') renderCatalogo();
     if(qual === 'estoque'){ renderEstoque(); mostraAnalise(); }
     store('p3d.aba', qual);
@@ -7138,7 +7469,10 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     // padrao e nenhuma retirada, como se voce nunca tivesse configurado.
     potes:    { ler: function(){ return {lista: potes()}; },     gravar: function(v){ setPotes(v.lista||[]); } },
     retirada: { ler: function(){ return {lista: retiradas()}; }, gravar: function(v){ setRetiradas(v.lista||[]); } },
-    motivo:   { ler: function(){ return {lista: motivos()}; },   gravar: function(v){ setMotivos(v.lista||[]); } }
+    motivo:   { ler: function(){ return {lista: motivos()}; },   gravar: function(v){ setMotivos(v.lista||[]); } },
+    // O combinado com as lojas precisa estar no celular na hora da visita,
+    // e no computador na hora de produzir.
+    parceria: { ler: function(){ return {lista: parcerias()}; }, gravar: function(v){ setParcerias(v.lista||[]); } }
   };
   // Enquanto aplicamos o que veio de fora, os salvamentos não podem
   // carimbar nada — senão o dado volta a subir e vira eco sem fim.
@@ -7233,6 +7567,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
     renderEstoque();
     renderGestao();
     renderAvisos();
+    renderParcerias();
     renderOrcamentos();
     renderAvaliacoes();
     renderCatalogo();
@@ -7830,6 +8165,7 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   if(minEst) $('estoqueMin').value = minEst;
   garanteIdsDoEstoque();
   renderEstoque();
+  renderParcerias();
   renderAvisos();
   trocaAba(load('p3d.aba') || 'calc');
   imgCarregaTudo().then(function(){
