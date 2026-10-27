@@ -419,7 +419,20 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   white-space:pre-wrap; color:var(--ink-2); font-size:13px; line-height:1.55;
   background:var(--surface-2); border-radius:8px; padding:10px 12px; margin:8px 0;
 }
-.orc .arqs{display:flex; flex-wrap:wrap; gap:8px; margin:8px 0}
+.orc .arqs{display:flex; flex-direction:column; gap:6px; margin:8px 0}
+.orc .arq{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  background:var(--surface-2); border:1px solid var(--line-strong);
+  border-radius:8px; padding:7px 10px;
+}
+/* O nome encolhe e corta; os botões nunca somem da tela. */
+.orc .arq .nome{flex:1; min-width:110px; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.orc .arq .tam{font-family:var(--font-mono); font-size:11.5px; color:var(--muted); flex:none}
+.orc .previa{margin:2px 0 4px}
+.orc .previa img{
+  max-width:100%; max-height:420px; border-radius:9px;
+  border:1px solid var(--line-strong); display:block;
+}
 .orc .arqs a{
   display:inline-flex; align-items:center; gap:6px; font-size:12px; font-family:var(--font-mono);
   background:var(--surface-2); border:1px solid var(--line-strong); border-radius:8px;
@@ -2994,20 +3007,100 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
    * inteiro do negócio dele. Cada clique pede um link novo, que vence em uma
    * hora, em vez de existir um endereço público para sempre.
    */
-  function baixaArquivoDeOrcamento(caminho, nome){
+  function ehImagem(a){
+    return /^image\//.test(a.tipo || '') || /\.(png|jpe?g|webp|gif|bmp|heic|heif)$/i.test(a.nome || '');
+  }
+
+  /**
+   * Pede ao Supabase um endereço temporário para o arquivo.
+   * `baixar` força o download com o nome original; sem ele o endereço
+   * serve para mostrar a imagem na tela.
+   */
+  function urlAssinada(caminho, nome, baixar){
     return api('/storage/v1/object/sign/orcamentos/' + caminho,
                {method:'POST', body: JSON.stringify({expiresIn: 3600})}, true)
       .then(function(r){
-        var a = document.createElement('a');
-        a.href = cfgNuvem().url.replace(/\/+$/, '') + '/storage/v1' + r.signedURL +
-                 '&download=' + encodeURIComponent(nome || '');
-        a.target = '_blank';
-        a.rel = 'noopener';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+        if(!r || !r.signedURL) throw new Error('o servidor não devolveu o endereço do arquivo');
+        return cfgNuvem().url.replace(/\/+$/, '') + '/storage/v1' + r.signedURL +
+               (baixar ? '&download=' + encodeURIComponent(nome || '') : '');
+      });
+  }
+
+  function explicaFalhaDeArquivo(e){
+    var m = (e && e.message) || String(e);
+    if(/401|jwt|token/i.test(m)) return 'Sua sessão expirou. Abra a Nuvem e entre de novo.';
+    if(/404|not found|exist/i.test(m)) return 'O arquivo não está mais no servidor.';
+    if(/failed to fetch|network/i.test(m)) return 'Sem conexão com o servidor.';
+    return m;
+  }
+
+  function baixaArquivoDeOrcamento(caminho, nome, botao){
+    var antes = botao ? botao.textContent : '';
+    if(botao){ botao.disabled = true; botao.textContent = 'Preparando…'; }
+
+    return urlAssinada(caminho, nome, true)
+      .then(function(url){
+        /* Confere se o arquivo responde antes de mandar o navegador até ele.
+           Como a página vai navegar para esse endereço, um arquivo faltando
+           devolveria um erro em JSON na tela inteira e você perderia o app.
+           O HEAD não baixa nada: só pergunta se existe. */
+        return fetch(url, {method:'HEAD'})
+          .then(function(r){
+            if(!r.ok) throw new Error('HTTP ' + r.status);
+            return url;
+          })
+          .catch(function(e){
+            // Erro de rede ou CORS não prova que o arquivo sumiu — nesse
+            // caso segue em frente, que o pior caso volta a ser o de antes.
+            if(/HTTP \d+/.test(e.message)) throw e;
+            return url;
+          });
       })
-      .catch(function(){ alert('Não consegui abrir o arquivo. Confira sua conexão e tente de novo.'); });
+      .then(function(url){
+        /* Navega a própria janela em vez de abrir outra aba. O Supabase
+           devolve o arquivo como anexo, então o navegador baixa e a página
+           continua exatamente onde estava.
+
+           Abrir aba nova aqui era o que quebrava no celular: quando a
+           assinatura chega, o toque que iniciou tudo já expirou, e o
+           navegador trata a aba como pop-up — bloqueia sem avisar.
+           Navegação, ao contrário de pop-up, não depende do toque. */
+        location.href = url;
+        if(botao){ botao.textContent = 'Baixando…'; }
+        setTimeout(function(){
+          if(botao){ botao.disabled = false; botao.textContent = antes; }
+        }, 2500);
+      })
+      .catch(function(e){
+        if(botao){ botao.disabled = false; botao.textContent = antes; }
+        alert('Não consegui baixar: ' + explicaFalhaDeArquivo(e));
+      });
+  }
+
+  /* Abre a foto ali mesmo. Para decidir se vale a pena fazer a peça, quase
+     sempre basta olhar — baixar e procurar na pasta de downloads é trabalho
+     à toa, ainda mais no celular. */
+  function mostraImagemDoOrcamento(caminho, nome, botao){
+    var alvo = botao.closest('.arq');
+    var jaAberta = alvo && alvo.parentNode.querySelector('.previa[data-de="' + CSS.escape(caminho) + '"]');
+    if(jaAberta){ jaAberta.remove(); botao.textContent = 'Ver'; return Promise.resolve(); }
+
+    var antes = botao.textContent;
+    botao.disabled = true; botao.textContent = 'Abrindo…';
+
+    return urlAssinada(caminho, nome, false)
+      .then(function(url){
+        var box = document.createElement('div');
+        box.className = 'previa';
+        box.setAttribute('data-de', caminho);
+        box.innerHTML = '<img src="' + escapa(url) + '" alt="' + escapa(nome || '') + '">';
+        alvo.parentNode.insertBefore(box, alvo.nextSibling);
+        botao.disabled = false; botao.textContent = 'Fechar';
+      })
+      .catch(function(e){
+        botao.disabled = false; botao.textContent = antes;
+        alert('Não consegui abrir a imagem: ' + explicaFalhaDeArquivo(e));
+      });
   }
 
   function mensagemDeOrcamento(o){
@@ -3096,8 +3189,16 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
 
         (arquivos.length
           ? '<div class="arqs">' + arquivos.map(function(a){
-              return '<a href="#" data-arq="' + escapa(a.caminho) + '" data-nome="' + escapa(a.nome) + '">' +
-                     escapa(a.nome) + ' · ' + (Number(a.tamanho||0)/1048576).toFixed(1) + ' MB</a>';
+              var mb = Number(a.tamanho||0)/1048576;
+              var tamanho = !a.tamanho ? '' : (mb < 0.1 ? Math.round(a.tamanho/1024) + ' KB' : mb.toFixed(1) + ' MB');
+              return '<div class="arq">' +
+                '<span class="nome" title="' + escapa(a.nome) + '">' + escapa(a.nome) + '</span>' +
+                (tamanho ? '<span class="tam">' + tamanho + '</span>' : '') +
+                (ehImagem(a)
+                  ? '<button class="btn tiny" type="button" data-ver="' + escapa(a.caminho) + '" data-nome="' + escapa(a.nome) + '">Ver</button>'
+                  : '') +
+                '<button class="btn tiny ghost" type="button" data-arq="' + escapa(a.caminho) + '" data-nome="' + escapa(a.nome) + '">Baixar</button>' +
+              '</div>';
             }).join('') + '</div>'
           : '<div class="hint">Sem arquivo anexado — o cliente descreveu a peça.</div>') +
 
@@ -3121,10 +3222,16 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
   }
 
   $('listaOrcamentos').addEventListener('click', function(e){
+    var ver = e.target.closest('[data-ver]');
+    if(ver){
+      e.preventDefault();
+      mostraImagemDoOrcamento(ver.dataset.ver, ver.dataset.nome, ver);
+      return;
+    }
     var arq = e.target.closest('[data-arq]');
     if(arq){
       e.preventDefault();
-      baixaArquivoDeOrcamento(arq.dataset.arq, arq.dataset.nome);
+      baixaArquivoDeOrcamento(arq.dataset.arq, arq.dataset.nome, arq);
       return;
     }
     var b = e.target.closest('[data-orc-resp]');
