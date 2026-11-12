@@ -5256,52 +5256,75 @@ dialog#dlgNuvem::backdrop{background:rgba(8,10,13,.55); backdrop-filter:blur(2px
      para tirar — porque o produto que o gerava não existe mais. */
   $('btnConfereLoja').addEventListener('click', function(){
     var btn = this, antes = btn.textContent;
+    var s = sessao();
+    if(!s || !s.user_id){
+      $('avisoOrfaos').innerHTML = '<div class="resumo-an" style="margin-bottom:16px">' +
+        'Entre na Nuvem primeiro: a conferência precisa perguntar ao servidor o que está publicado.</div>';
+      return;
+    }
     btn.disabled = true; btn.textContent = 'Conferindo…';
 
-    var naLoja = vitrine();
-    var doCatalogo = {};
-    catalogo().forEach(function(c){
-      (c.produtos||[]).forEach(function(p){
-        if(p.pub && !p.link) doCatalogo[enderecoDe(p, {})] = true;
-      });
-    });
+    /* Pergunta ao SERVIDOR, não à cópia local. O produto pode ter sido
+       publicado de outro aparelho e nunca ter passado por este: comparando
+       só com o que está guardado aqui, a sobra ficava invisível
+       justamente no caso em que ela existe. */
+    api('/rest/v1/dados?select=id,conteudo&colecao=eq.loja&apagado=is.false', {method:'GET'}, true)
+      .then(function(linhas){
+        linhas = linhas || [];
+        var vivos = montaVitrine().map(function(v){ return v.id; });
+        var orfaos = linhas.filter(function(l){ return vivos.indexOf(l.id) === -1; });
 
-    var vivos = montaVitrine().map(function(v){ return v.id; });
-    var orfaos = naLoja.filter(function(v){ return vivos.indexOf(v.id) === -1; });
+        btn.disabled = false; btn.textContent = antes;
 
-    btn.disabled = false; btn.textContent = antes;
+        if(!linhas.length){
+          $('avisoOrfaos').innerHTML = '<div class="resumo-an" style="margin-bottom:16px">' +
+            'O servidor não tem nenhum produto publicado.</div>';
+          return;
+        }
+        if(!orfaos.length){
+          $('avisoOrfaos').innerHTML = '<div class="resumo-an" style="margin-bottom:16px">' +
+            '<b>' + linhas.length + ' produto(s) na loja</b>, todos com ficha no catálogo. Nada sobrando.</div>';
+          return;
+        }
 
-    if(!naLoja.length){
-      $('avisoOrfaos').innerHTML = '<div class="resumo-an" style="margin-bottom:16px">' +
-        'Nenhum produto publicado na loja no momento.</div>';
-      return;
-    }
-    if(!orfaos.length){
-      $('avisoOrfaos').innerHTML = '<div class="resumo-an" style="margin-bottom:16px">' +
-        '<b>' + naLoja.length + ' produto(s) na loja</b>, todos com ficha no catálogo. Nada sobrando.</div>';
-      return;
-    }
-    $('avisoOrfaos').innerHTML = '<div class="resumo-an" style="margin-bottom:16px">' +
-      '<b>' + orfaos.length + ' produto(s) na loja sem ficha no catálogo:</b><br>' +
-      orfaos.map(function(v){ return '· ' + escapa(v.nome || v.id); }).join('<br>') +
-      '<br>Eles aparecem no site mas não dá para editar aqui, porque o produto que os criou foi apagado.' +
-      '<div style="margin-top:10px"><button class="btn tiny primary" type="button" id="btnTiraOrfaos">Tirar da loja</button></div></div>';
-
-    $('btnTiraOrfaos').addEventListener('click', function(){
-      var b = this; b.disabled = true; b.textContent = 'Removendo…';
-      // Mesma rotina da publicação normal: a lista nova não tem os órfãos,
-      // então carimbaLista cria a lápide e a loja perde o produto na
-      // próxima sincronização.
-      atualizaVitrine();
-      sincronizar().then(function(){
         $('avisoOrfaos').innerHTML = '<div class="resumo-an" style="margin-bottom:16px">' +
-          'Pronto. ' + orfaos.length + ' produto(s) saíram da loja.</div>';
-      }).catch(function(e){
-        b.disabled = false; b.textContent = 'Tentar de novo';
-        alert('Removi aqui, mas não consegui avisar a nuvem: ' + ((e && e.message) || e) +
-              '\n\nAbra a Nuvem e toque em Sincronizar agora.');
+          '<b>' + orfaos.length + ' produto(s) na loja sem ficha no catálogo:</b><br>' +
+          orfaos.map(function(l){
+            return '· ' + escapa((l.conteudo && l.conteudo.nome) || l.id);
+          }).join('<br>') +
+          '<br>Estão no site mas não há o que editar aqui — a ficha que os criou não existe mais neste catálogo.' +
+          '<div style="margin-top:10px"><button class="btn tiny primary" type="button" id="btnTiraOrfaos">Tirar da loja</button></div></div>';
+
+        $('btnTiraOrfaos').addEventListener('click', function(){
+          var b = this; b.disabled = true; b.textContent = 'Removendo…';
+
+          /* Marca como apagado direto no servidor. A vitrine do site só
+             enxerga linha não apagada, então o produto sai na hora — sem
+             depender de este aparelho ter a linha para gerar a lápide. */
+          api('/rest/v1/dados?on_conflict=usuario,colecao,id', {
+            method: 'POST',
+            headers: {'Prefer': 'resolution=merge-duplicates'},
+            body: JSON.stringify(orfaos.map(function(l){
+              return {usuario: s.user_id, colecao: 'loja', id: l.id, conteudo: {}, apagado: true};
+            }))
+          }, true).then(function(){
+            // Tira também da cópia local, para não ressuscitar na próxima
+            // sincronização deste aparelho.
+            var ids = orfaos.map(function(l){ return l.id; });
+            setVitrine(vitrine().filter(function(v){ return ids.indexOf(v.id) === -1; }));
+            $('avisoOrfaos').innerHTML = '<div class="resumo-an" style="margin-bottom:16px">' +
+              'Pronto. ' + orfaos.length + ' produto(s) saíram da loja. Atualize a página do site para conferir.</div>';
+          }).catch(function(e){
+            b.disabled = false; b.textContent = 'Tentar de novo';
+            alert('Não consegui remover: ' + ((e && e.message) || e));
+          });
+        });
+      })
+      .catch(function(e){
+        btn.disabled = false; btn.textContent = antes;
+        $('avisoOrfaos').innerHTML = '<div class="resumo-an" style="margin-bottom:16px">' +
+          'Não consegui perguntar ao servidor: ' + escapa((e && e.message) || String(e)) + '</div>';
       });
-    });
   });
 
   // Texto e preço atualizam o modelo sem redesenhar, senão o campo perde o foco a cada tecla.
